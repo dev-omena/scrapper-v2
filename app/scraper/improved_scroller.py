@@ -27,14 +27,31 @@ class ImprovedScroller:
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                # Try multiple selectors for search results (fixed syntax)
-                selectors = [
-                    "[role='feed']",
-                    "[data-value='Search results']",
-                    ".m6QErb",
-                    ".section-scrollbox",
-                    ".section-layout-root"
-                ]
+                # Check if we're still on consent page
+                current_url = self.driver.current_url
+                if "consent.google.com" in current_url:
+                    Communicator.show_message("Still on consent page, trying to proceed anyway...")
+                    print("DEBUG: Still on consent page, trying to proceed anyway")
+                    
+                    # Try to find any scrollable element even on consent page
+                    selectors = [
+                        "body",
+                        "html",
+                        "[role='main']",
+                        ".consent-page",
+                        ".consent-dialog"
+                    ]
+                else:
+                    # Try multiple selectors for search results
+                    selectors = [
+                        "[role='feed']",
+                        "[data-value='Search results']",
+                        ".m6QErb",
+                        ".section-scrollbox",
+                        ".section-layout-root",
+                        ".section-scrollbox-y",
+                        ".section-scrollbox-x"
+                    ]
                 
                 for selector in selectors:
                     try:

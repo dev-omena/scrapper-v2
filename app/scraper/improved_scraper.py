@@ -39,8 +39,48 @@ class ImprovedBackend(Base):
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         options.add_argument('--disable-blink-features=AutomationControlled')
         
-        # Add options to minimize consent pages
+        # Anti-detection and consent bypass options
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor,VizServiceDisplayCompositor')
+        options.add_argument('--disable-extensions-file-access-check')
+        options.add_argument('--disable-extensions-http-throttling')
+        options.add_argument('--disable-component-extensions-with-background-pages')
+        options.add_argument('--disable-default-apps')
+        options.add_argument('--disable-component-update')
+        options.add_argument('--disable-client-side-phishing-detection')
+        options.add_argument('--disable-sync-preferences')
+        options.add_argument('--disable-background-mode')
+        options.add_argument('--disable-features=TranslateUI')
+        options.add_argument('--disable-ipc-flooding-protection')
+        options.add_argument('--disable-hang-monitor')
+        options.add_argument('--disable-prompt-on-repost')
+        options.add_argument('--disable-domain-reliability')
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-sync')
+        options.add_argument('--disable-translate')
+        options.add_argument('--disable-logging')
+        options.add_argument('--disable-permissions-api')
+        options.add_argument('--disable-notifications')
+        options.add_argument('--disable-plugins-discovery')
+        options.add_argument('--disable-preconnect')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        
+        # Additional privacy settings to bypass consent
         options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-first-run')
+        options.add_argument('--no-default-browser-check')
+        options.add_argument('--disable-default-apps')
+        options.add_argument('--disable-popup-blocking')
+        options.add_argument('--disable-prompt-on-repost')
+        options.add_argument('--disable-hang-monitor')
+        options.add_argument('--disable-client-side-phishing-detection')
+        options.add_argument('--disable-sync-preferences')
+        options.add_argument('--disable-background-mode')
+        options.add_argument('--disable-features=TranslateUI')
         options.add_argument('--disable-ipc-flooding-protection')
         options.add_argument('--disable-hang-monitor')
         options.add_argument('--disable-prompt-on-repost')
@@ -127,7 +167,12 @@ class ImprovedBackend(Base):
                 bypass_urls = [
                     f"https://maps.google.com/maps/search/{encoded_query}/",
                     f"https://www.google.com/maps/search/{encoded_query}/?hl=en",
-                    f"https://www.google.com/maps/search/{encoded_query}/?hl=ar"
+                    f"https://www.google.com/maps/search/{encoded_query}/?hl=ar",
+                    f"https://www.google.com/maps/search/{encoded_query}/?gl=US&hl=en",
+                    f"https://maps.google.com/maps/search/{encoded_query}/?gl=US&hl=en",
+                    f"https://www.google.com/maps/search/{encoded_query}/?gl=GB&hl=en",
+                    f"https://www.google.com/maps/search/{encoded_query}/?gl=CA&hl=en",
+                    f"https://www.google.com/maps/search/{encoded_query}/?gl=AU&hl=en"
                 ]
                 
                 for i, bypass_url in enumerate(bypass_urls):
