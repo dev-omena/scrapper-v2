@@ -40,6 +40,14 @@ class ImprovedBackend(Base):
         options.add_argument('--window-size=1920,1080')
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
+        # Add options to avoid consent pages
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument('--disable-web-security')
+        options.add_argument('--allow-running-insecure-content')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        
         # Disable images for faster loading
         prefs = {"profile.managed_default_content_settings.images": 2}
         options.add_experimental_option("prefs", prefs)
@@ -100,6 +108,58 @@ class ImprovedBackend(Base):
             # Check for any error messages or redirects
             page_title = self.driver.title
             Communicator.show_message(f"Page title: {page_title}")
+            
+            # Handle Google consent page
+            if "consent.google.com" in current_url or "Voordat je verdergaat" in page_title:
+                Communicator.show_message("Detected Google consent page, attempting to accept...")
+                try:
+                    # Try to find and click accept button
+                    accept_selectors = [
+                        "button[aria-label*='Accept']",
+                        "button[aria-label*='I agree']",
+                        "button[aria-label*='Agree']",
+                        "button[aria-label*='Accept all']",
+                        "button[aria-label*='I accept']",
+                        "button:contains('Accept')",
+                        "button:contains('I agree')",
+                        "button:contains('Agree')",
+                        "button:contains('Accept all')",
+                        "button:contains('I accept')"
+                    ]
+                    
+                    for selector in accept_selectors:
+                        try:
+                            if ":contains(" in selector:
+                                # Use XPath for text content
+                                xpath = f"//button[contains(text(), '{selector.split(':contains(')[1].split(')')[0]}')]"
+                                button = self.driver.find_element("xpath", xpath)
+                            else:
+                                button = self.driver.find_element("css selector", selector)
+                            
+                            if button:
+                                Communicator.show_message(f"Found consent button: {selector}")
+                                button.click()
+                                sleep(2)
+                                break
+                        except:
+                            continue
+                    
+                    # Wait for redirect to actual search page
+                    sleep(3)
+                    current_url = self.driver.current_url
+                    Communicator.show_message(f"After consent, current URL: {current_url}")
+                    
+                except Exception as e:
+                    Communicator.show_message(f"Error handling consent page: {str(e)}")
+            
+            # Check if we're still on consent page
+            if "consent.google.com" in self.driver.current_url:
+                Communicator.show_message("Still on consent page, trying alternative approach...")
+                # Try to navigate directly to maps with different parameters
+                alternative_url = f"https://www.google.com/maps/search/{encoded_query}/@25.2854,51.5310,12z"
+                Communicator.show_message(f"Trying alternative URL: {alternative_url}")
+                self.driver.get(alternative_url)
+                sleep(3)
             
             # Start scrolling and scraping
             self.scroller.scroll()

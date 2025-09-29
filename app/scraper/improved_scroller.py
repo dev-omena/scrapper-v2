@@ -27,7 +27,7 @@ class ImprovedScroller:
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                # Try multiple selectors for search results
+                # Try multiple selectors for search results (fixed syntax)
                 selectors = [
                     "[role='feed']",
                     "[data-value='Search results']",
@@ -37,10 +37,14 @@ class ImprovedScroller:
                 ]
                 
                 for selector in selectors:
-                    element = self.driver.execute_script(f"return document.querySelector('{selector}')")
-                    if element:
-                        Communicator.show_message(f"Found search results using selector: {selector}")
-                        return element
+                    try:
+                        element = self.driver.execute_script(f"return document.querySelector('{selector}')")
+                        if element:
+                            Communicator.show_message(f"Found search results using selector: {selector}")
+                            return element
+                    except Exception as e:
+                        Communicator.show_message(f"Error with selector {selector}: {str(e)}")
+                        continue
                 
                 # Check if we're on a "no results" page
                 no_results_selectors = [
