@@ -160,11 +160,16 @@ class ImprovedBackend(Base):
                     ]
                     
                     consent_clicked = False
-                    for selector in accept_selectors:
+                    Communicator.show_message(f"Trying {len(accept_selectors)} different selectors...")
+                    
+                    for i, selector in enumerate(accept_selectors):
                         # Check timeout
                         if time.time() - consent_start_time > consent_timeout:
                             Communicator.show_message("Consent handling timeout reached")
                             break
+                        
+                        Communicator.show_message(f"Trying selector {i+1}/{len(accept_selectors)}: {selector}")
+                        print(f"DEBUG: Trying selector {i+1}: {selector}")  # Console print
                             
                         try:
                             if selector.startswith("//"):
@@ -181,17 +186,41 @@ class ImprovedBackend(Base):
                             
                             if button and button.is_displayed():
                                 Communicator.show_message(f"Found consent button: {selector}")
+                                print(f"DEBUG: Found button with selector: {selector}")  # Console print
+                                
                                 # Try multiple click methods
                                 try:
+                                    Communicator.show_message("Trying standard click...")
+                                    print("DEBUG: Trying standard click")
                                     button.click()
-                                except:
+                                    Communicator.show_message("Standard click successful!")
+                                    print("DEBUG: Standard click successful")
+                                except Exception as e:
+                                    Communicator.show_message(f"Standard click failed: {str(e)}")
+                                    print(f"DEBUG: Standard click failed: {str(e)}")
                                     try:
+                                        Communicator.show_message("Trying JavaScript click...")
+                                        print("DEBUG: Trying JavaScript click")
                                         self.driver.execute_script("arguments[0].click();", button)
-                                    except:
-                                        self.driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('click', {bubbles: true}));", button)
+                                        Communicator.show_message("JavaScript click successful!")
+                                        print("DEBUG: JavaScript click successful")
+                                    except Exception as e2:
+                                        Communicator.show_message(f"JavaScript click failed: {str(e2)}")
+                                        print(f"DEBUG: JavaScript click failed: {str(e2)}")
+                                        try:
+                                            Communicator.show_message("Trying event dispatch...")
+                                            print("DEBUG: Trying event dispatch")
+                                            self.driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('click', {bubbles: true}));", button)
+                                            Communicator.show_message("Event dispatch successful!")
+                                            print("DEBUG: Event dispatch successful")
+                                        except Exception as e3:
+                                            Communicator.show_message(f"Event dispatch failed: {str(e3)}")
+                                            print(f"DEBUG: Event dispatch failed: {str(e3)}")
                                 
                                 sleep(3)
                                 consent_clicked = True
+                                Communicator.show_message("Consent button clicked successfully!")
+                                print("DEBUG: Consent button clicked successfully")
                                 break
                         except Exception as e:
                             Communicator.show_message(f"Selector {selector} failed: {str(e)}")
@@ -236,41 +265,71 @@ class ImprovedBackend(Base):
                 for i, alt_url in enumerate(alternative_urls):
                     try:
                         Communicator.show_message(f"Trying alternative URL {i+1}: {alt_url}")
+                        print(f"DEBUG: Trying alternative URL {i+1}: {alt_url}")  # Console print
                         self.driver.get(alt_url)
                         sleep(3)
                         
                         current_url = self.driver.current_url
+                        page_title = self.driver.title
                         Communicator.show_message(f"After alternative URL, current URL: {current_url}")
+                        Communicator.show_message(f"Page title: {page_title}")
+                        print(f"DEBUG: URL: {current_url}, Title: {page_title}")  # Console print
                         
                         if "consent.google.com" not in current_url:
                             Communicator.show_message("Successfully bypassed consent page!")
+                            print("DEBUG: Successfully bypassed consent page!")  # Console print
                             break
+                        else:
+                            Communicator.show_message("Still on consent page, trying next URL...")
+                            print("DEBUG: Still on consent page, trying next URL...")  # Console print
                     except Exception as e:
                         Communicator.show_message(f"Alternative URL {i+1} failed: {str(e)}")
+                        print(f"DEBUG: Alternative URL {i+1} failed: {str(e)}")  # Console print
                         continue
                 
                 # If still on consent page, try to get page source for debugging
                 if "consent.google.com" in self.driver.current_url:
                     Communicator.show_message("All alternative URLs failed, getting page source for debugging...")
+                    print("DEBUG: All alternative URLs failed, analyzing page source...")  # Console print
                     try:
                         page_source = self.driver.page_source
+                        Communicator.show_message(f"Page source length: {len(page_source)} characters")
+                        print(f"DEBUG: Page source length: {len(page_source)} characters")  # Console print
+                        
                         # Look for any buttons in the page source
                         if "button" in page_source.lower():
                             Communicator.show_message("Found buttons in page source, trying to extract...")
+                            print("DEBUG: Found buttons in page source")  # Console print
                             # Try to find buttons using BeautifulSoup
                             from bs4 import BeautifulSoup
                             soup = BeautifulSoup(page_source, 'html.parser')
                             buttons = soup.find_all('button')
                             Communicator.show_message(f"Found {len(buttons)} buttons on the page")
+                            print(f"DEBUG: Found {len(buttons)} buttons on the page")  # Console print
                             
                             for i, button in enumerate(buttons[:5]):  # Check first 5 buttons
                                 button_text = button.get_text(strip=True)
                                 button_attrs = button.attrs
                                 Communicator.show_message(f"Button {i+1}: text='{button_text}', attrs={button_attrs}")
+                                print(f"DEBUG: Button {i+1}: text='{button_text}', attrs={button_attrs}")  # Console print
                         else:
                             Communicator.show_message("No buttons found in page source")
+                            print("DEBUG: No buttons found in page source")  # Console print
+                            
+                        # Also check for other clickable elements
+                        clickable_elements = soup.find_all(['a', 'div', 'span'], {'role': 'button'})
+                        Communicator.show_message(f"Found {len(clickable_elements)} other clickable elements")
+                        print(f"DEBUG: Found {len(clickable_elements)} other clickable elements")  # Console print
+                        
+                        for i, element in enumerate(clickable_elements[:3]):  # Check first 3
+                            element_text = element.get_text(strip=True)
+                            element_attrs = element.attrs
+                            Communicator.show_message(f"Clickable element {i+1}: text='{element_text}', attrs={element_attrs}")
+                            print(f"DEBUG: Clickable element {i+1}: text='{element_text}', attrs={element_attrs}")  # Console print
+                            
                     except Exception as e:
                         Communicator.show_message(f"Error analyzing page source: {str(e)}")
+                        print(f"DEBUG: Error analyzing page source: {str(e)}")  # Console print
             
             # Start scrolling and scraping
             self.scroller.scroll()
