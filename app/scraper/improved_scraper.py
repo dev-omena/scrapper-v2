@@ -170,6 +170,10 @@ class ImprovedBackend(Base):
                         
                         Communicator.show_message(f"Trying selector {i+1}/{len(accept_selectors)}: {selector}")
                         print(f"DEBUG: Trying selector {i+1}: {selector}")  # Console print
+                        
+                        # Add per-selector timeout (2 seconds max per selector)
+                        selector_start_time = time.time()
+                        selector_timeout = 2
                             
                         try:
                             if selector.startswith("//"):
@@ -224,10 +228,55 @@ class ImprovedBackend(Base):
                                 break
                         except Exception as e:
                             Communicator.show_message(f"Selector {selector} failed: {str(e)}")
+                            print(f"DEBUG: Selector {selector} failed: {str(e)}")  # Console print
+                            continue
+                        
+                        # Check per-selector timeout
+                        if time.time() - selector_start_time > selector_timeout:
+                            Communicator.show_message(f"Selector {selector} timed out, moving to next...")
+                            print(f"DEBUG: Selector {selector} timed out, moving to next...")  # Console print
                             continue
                     
                     if not consent_clicked:
                         Communicator.show_message("Could not find consent button, trying alternative approach...")
+                        print("DEBUG: Could not find consent button, trying alternative approach...")  # Console print
+                        
+                        # First, let's see what's actually on the page
+                        try:
+                            page_source = self.driver.page_source
+                            Communicator.show_message(f"Page source length: {len(page_source)} characters")
+                            print(f"DEBUG: Page source length: {len(page_source)} characters")  # Console print
+                            
+                            # Look for any buttons or clickable elements
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(page_source, 'html.parser')
+                            
+                            # Find all buttons
+                            buttons = soup.find_all('button')
+                            Communicator.show_message(f"Found {len(buttons)} buttons on consent page")
+                            print(f"DEBUG: Found {len(buttons)} buttons on consent page")  # Console print
+                            
+                            for i, button in enumerate(buttons[:3]):  # Check first 3 buttons
+                                button_text = button.get_text(strip=True)
+                                button_attrs = button.attrs
+                                Communicator.show_message(f"Consent page button {i+1}: text='{button_text}', attrs={button_attrs}")
+                                print(f"DEBUG: Consent page button {i+1}: text='{button_text}', attrs={button_attrs}")  # Console print
+                            
+                            # Find all clickable elements
+                            clickable_elements = soup.find_all(['a', 'div', 'span'], {'role': 'button'})
+                            Communicator.show_message(f"Found {len(clickable_elements)} clickable elements")
+                            print(f"DEBUG: Found {len(clickable_elements)} clickable elements")  # Console print
+                            
+                            for i, element in enumerate(clickable_elements[:3]):  # Check first 3
+                                element_text = element.get_text(strip=True)
+                                element_attrs = element.attrs
+                                Communicator.show_message(f"Clickable element {i+1}: text='{element_text}', attrs={element_attrs}")
+                                print(f"DEBUG: Clickable element {i+1}: text='{element_text}', attrs={element_attrs}")  # Console print
+                                
+                        except Exception as e:
+                            Communicator.show_message(f"Error analyzing consent page: {str(e)}")
+                            print(f"DEBUG: Error analyzing consent page: {str(e)}")  # Console print
+                        
                         # Try to find any clickable element on the page
                         try:
                             all_buttons = self.driver.find_elements("tag name", "button")
