@@ -38,7 +38,9 @@ class ImprovedScroller:
                 
                 for selector in selectors:
                     try:
-                        element = self.driver.execute_script(f"return document.querySelector('{selector}')")
+                        # Escape quotes in selector for JavaScript
+                        escaped_selector = selector.replace('"', '\\"')
+                        element = self.driver.execute_script(f"return document.querySelector('{escaped_selector}')")
                         if element:
                             Communicator.show_message(f"Found search results using selector: {selector}")
                             return element
@@ -54,10 +56,15 @@ class ImprovedScroller:
                 ]
                 
                 for selector in no_results_selectors:
-                    no_results = self.driver.execute_script(f"return document.querySelector('{selector}')")
-                    if no_results:
-                        Communicator.show_message("No results found for this search query")
-                        return None
+                    try:
+                        # Escape quotes in selector for JavaScript
+                        escaped_selector = selector.replace('"', '\\"')
+                        no_results = self.driver.execute_script(f"return document.querySelector('{escaped_selector}')")
+                        if no_results:
+                            Communicator.show_message("No results found for this search query")
+                            return None
+                    except Exception as e:
+                        continue
                 
                 time.sleep(1)
                 
@@ -92,9 +99,7 @@ class ImprovedScroller:
             try:
                 # Find the scrollable element again (it might change)
                 scrollAbleElement = self.driver.execute_script(
-                    """return document.querySelector("[role='feed']") || 
-                           document.querySelector(".m6QErb") ||
-                           document.querySelector(".section-scrollbox")"""
+                    "return document.querySelector('[role=\"feed\"]') || document.querySelector('.m6QErb') || document.querySelector('.section-scrollbox')"
                 )
                 
                 if scrollAbleElement is None:
@@ -116,16 +121,14 @@ class ImprovedScroller:
                 if new_height == last_height:
                     # Check if we've reached the end
                     end_element = self.driver.execute_script(
-                        """return document.querySelector(".PbZDve") || 
-                               document.querySelector("[data-value='You've reached the end']") ||
-                               document.querySelector(".section-layout-root[data-value='You've reached the end']")"""
+                        "return document.querySelector('.PbZDve') || document.querySelector('[data-value=\"You\\'ve reached the end\"]') || document.querySelector('.section-layout-root[data-value=\"You\\'ve reached the end\"]')"
                     )
                     
                     if end_element is None:
                         # Try clicking the last result to load more
                         try:
                             self.driver.execute_script(
-                                "array=document.getElementsByClassName('hfpxzc');if(array.length>0)array[array.length-1].click();"
+                                "var array = document.getElementsByClassName('hfpxzc'); if(array.length > 0) array[array.length-1].click();"
                             )
                             time.sleep(2)
                         except JavascriptException:
