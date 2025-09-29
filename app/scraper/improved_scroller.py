@@ -38,9 +38,14 @@ class ImprovedScroller:
                 
                 for selector in selectors:
                     try:
-                        # Escape quotes in selector for JavaScript
-                        escaped_selector = selector.replace('"', '\\"')
-                        element = self.driver.execute_script(f"return document.querySelector('{escaped_selector}')")
+                        # Use Selenium's find_element instead of JavaScript
+                        if selector.startswith("[") and selector.endswith("]"):
+                            # CSS attribute selector
+                            element = self.driver.find_element("css selector", selector)
+                        else:
+                            # Regular CSS selector
+                            element = self.driver.find_element("css selector", selector)
+                        
                         if element:
                             Communicator.show_message(f"Found search results using selector: {selector}")
                             return element
@@ -57,9 +62,8 @@ class ImprovedScroller:
                 
                 for selector in no_results_selectors:
                     try:
-                        # Escape quotes in selector for JavaScript
-                        escaped_selector = selector.replace('"', '\\"')
-                        no_results = self.driver.execute_script(f"return document.querySelector('{escaped_selector}')")
+                        # Use Selenium's find_element instead of JavaScript
+                        no_results = self.driver.find_element("css selector", selector)
                         if no_results:
                             Communicator.show_message("No results found for this search query")
                             return None
@@ -98,9 +102,16 @@ class ImprovedScroller:
 
             try:
                 # Find the scrollable element again (it might change)
-                scrollAbleElement = self.driver.execute_script(
-                    "return document.querySelector('[role=\"feed\"]') || document.querySelector('.m6QErb') || document.querySelector('.section-scrollbox')"
-                )
+                scrollAbleElement = None
+                scrollable_selectors = ["[role='feed']", ".m6QErb", ".section-scrollbox"]
+                
+                for selector in scrollable_selectors:
+                    try:
+                        scrollAbleElement = self.driver.find_element("css selector", selector)
+                        if scrollAbleElement:
+                            break
+                    except:
+                        continue
                 
                 if scrollAbleElement is None:
                     Communicator.show_message("Lost scrollable element, trying to find results...")
@@ -120,18 +131,27 @@ class ImprovedScroller:
                 
                 if new_height == last_height:
                     # Check if we've reached the end
-                    end_element = self.driver.execute_script(
-                        "return document.querySelector('.PbZDve') || document.querySelector('[data-value=\"You\\'ve reached the end\"]') || document.querySelector('.section-layout-root[data-value=\"You\\'ve reached the end\"]')"
-                    )
+                    end_element = None
+                    end_selectors = [".PbZDve", "[data-value='You've reached the end']", ".section-layout-root[data-value='You've reached the end']"]
+                    
+                    for selector in end_selectors:
+                        try:
+                            end_element = self.driver.find_element("css selector", selector)
+                            if end_element:
+                                break
+                        except:
+                            continue
                     
                     if end_element is None:
                         # Try clicking the last result to load more
                         try:
-                            self.driver.execute_script(
-                                "var array = document.getElementsByClassName('hfpxzc'); if(array.length > 0) array[array.length-1].click();"
-                            )
-                            time.sleep(2)
-                        except JavascriptException:
+                            # Find all result links and click the last one
+                            result_links = self.driver.find_elements("css selector", "a.hfpxzc")
+                            if result_links and len(result_links) > 0:
+                                last_link = result_links[-1]
+                                last_link.click()
+                                time.sleep(2)
+                        except Exception as e:
                             pass
                     else:
                         Communicator.show_message("Reached the end of results")
