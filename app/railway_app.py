@@ -15,7 +15,7 @@ import sys
 # Add the app directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from scraper.scraper import Backend
+from scraper.improved_scraper import ImprovedBackend as Backend
 from scraper.communicator import Communicator
 from scraper.datasaver import DataSaver
 
@@ -440,6 +440,7 @@ def scrape():
                 railway_comm.show_message(f"Starting scraping job {job_id}")
                 railway_comm.show_message(f"Search query: {search_query}")
                 railway_comm.show_message("Initializing Chrome in headless mode...")
+                railway_comm.show_message("Note: Arabic and international searches are supported")
                 
                 # Set up communicator for Railway environment FIRST
                 # Create a mock frontend object for the communicator
