@@ -39,6 +39,24 @@ class ImprovedBackend(Base):
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         options.add_argument('--disable-blink-features=AutomationControlled')
         
+        # Add options to minimize consent pages
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-ipc-flooding-protection')
+        options.add_argument('--disable-hang-monitor')
+        options.add_argument('--disable-prompt-on-repost')
+        options.add_argument('--disable-domain-reliability')
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-sync')
+        options.add_argument('--disable-translate')
+        options.add_argument('--disable-logging')
+        options.add_argument('--disable-permissions-api')
+        options.add_argument('--disable-notifications')
+        options.add_argument('--disable-plugins-discovery')
+        options.add_argument('--disable-preconnect')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        
         # Disable images for faster loading
         prefs = {"profile.managed_default_content_settings.images": 2}
         options.add_experimental_option("prefs", prefs)
@@ -206,11 +224,53 @@ class ImprovedBackend(Base):
             # Check if we're still on consent page
             if "consent.google.com" in self.driver.current_url:
                 Communicator.show_message("Still on consent page, trying alternative approach...")
-                # Try to navigate directly to maps with different parameters
-                alternative_url = f"https://www.google.com/maps/search/{encoded_query}/@25.2854,51.5310,12z"
-                Communicator.show_message(f"Trying alternative URL: {alternative_url}")
-                self.driver.get(alternative_url)
-                sleep(3)
+                
+                # Try multiple alternative approaches
+                alternative_urls = [
+                    f"https://www.google.com/maps/search/{encoded_query}/@25.2854,51.5310,12z",
+                    f"https://maps.google.com/maps/search/{encoded_query}/",
+                    f"https://www.google.com/maps/search/{encoded_query}/?hl=en",
+                    f"https://www.google.com/maps/search/{encoded_query}/?hl=ar"
+                ]
+                
+                for i, alt_url in enumerate(alternative_urls):
+                    try:
+                        Communicator.show_message(f"Trying alternative URL {i+1}: {alt_url}")
+                        self.driver.get(alt_url)
+                        sleep(3)
+                        
+                        current_url = self.driver.current_url
+                        Communicator.show_message(f"After alternative URL, current URL: {current_url}")
+                        
+                        if "consent.google.com" not in current_url:
+                            Communicator.show_message("Successfully bypassed consent page!")
+                            break
+                    except Exception as e:
+                        Communicator.show_message(f"Alternative URL {i+1} failed: {str(e)}")
+                        continue
+                
+                # If still on consent page, try to get page source for debugging
+                if "consent.google.com" in self.driver.current_url:
+                    Communicator.show_message("All alternative URLs failed, getting page source for debugging...")
+                    try:
+                        page_source = self.driver.page_source
+                        # Look for any buttons in the page source
+                        if "button" in page_source.lower():
+                            Communicator.show_message("Found buttons in page source, trying to extract...")
+                            # Try to find buttons using BeautifulSoup
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(page_source, 'html.parser')
+                            buttons = soup.find_all('button')
+                            Communicator.show_message(f"Found {len(buttons)} buttons on the page")
+                            
+                            for i, button in enumerate(buttons[:5]):  # Check first 5 buttons
+                                button_text = button.get_text(strip=True)
+                                button_attrs = button.attrs
+                                Communicator.show_message(f"Button {i+1}: text='{button_text}', attrs={button_attrs}")
+                        else:
+                            Communicator.show_message("No buttons found in page source")
+                    except Exception as e:
+                        Communicator.show_message(f"Error analyzing page source: {str(e)}")
             
             # Start scrolling and scraping
             self.scroller.scroll()
