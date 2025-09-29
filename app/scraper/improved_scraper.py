@@ -2,6 +2,7 @@
 Improved scraper with better search handling and debugging
 """
 
+import time
 from time import sleep
 from scraper.base import Base
 from scraper.improved_scroller import ImprovedScroller
@@ -102,37 +103,97 @@ class ImprovedBackend(Base):
             # Handle Google consent page
             if "consent.google.com" in current_url or "Voordat je verdergaat" in page_title:
                 Communicator.show_message("Detected Google consent page, attempting to accept...")
+                consent_start_time = time.time()
+                consent_timeout = 30  # 30 seconds timeout for consent handling
+                
                 try:
-                    # Try to find and click accept button
+                    # Try to find and click accept button (multiple languages and methods)
                     accept_selectors = [
+                        # English buttons
                         "button[aria-label*='Accept']",
                         "button[aria-label*='I agree']",
                         "button[aria-label*='Agree']",
                         "button[aria-label*='Accept all']",
                         "button[aria-label*='I accept']",
-                        "button:contains('Accept')",
-                        "button:contains('I agree')",
-                        "button:contains('Agree')",
-                        "button:contains('Accept all')",
-                        "button:contains('I accept')"
+                        "button[aria-label*='Accept all cookies']",
+                        # Dutch buttons
+                        "button[aria-label*='Accepteren']",
+                        "button[aria-label*='Akkoord']",
+                        "button[aria-label*='Alles accepteren']",
+                        # Generic buttons
+                        "button[type='submit']",
+                        "button[data-value='Accept']",
+                        "button[data-value='Agree']",
+                        # Text-based selectors
+                        "//button[contains(text(), 'Accept')]",
+                        "//button[contains(text(), 'Agree')]",
+                        "//button[contains(text(), 'Accepteren')]",
+                        "//button[contains(text(), 'Akkoord')]",
+                        "//button[contains(text(), 'I agree')]",
+                        "//button[contains(text(), 'Accept all')]",
+                        "//button[contains(text(), 'Alles accepteren')]",
+                        # Form buttons
+                        "form button",
+                        "div[role='button']",
+                        # ID-based selectors
+                        "#accept",
+                        "#agree",
+                        "#accept-all"
                     ]
                     
+                    consent_clicked = False
                     for selector in accept_selectors:
+                        # Check timeout
+                        if time.time() - consent_start_time > consent_timeout:
+                            Communicator.show_message("Consent handling timeout reached")
+                            break
+                            
                         try:
-                            if ":contains(" in selector:
+                            if selector.startswith("//"):
+                                # XPath selector
+                                button = self.driver.find_element("xpath", selector)
+                            elif ":contains(" in selector:
                                 # Use XPath for text content
-                                xpath = f"//button[contains(text(), '{selector.split(':contains(')[1].split(')')[0]}')]"
+                                text = selector.split(':contains(')[1].split(')')[0]
+                                xpath = f"//button[contains(text(), '{text}')]"
                                 button = self.driver.find_element("xpath", xpath)
                             else:
+                                # CSS selector
                                 button = self.driver.find_element("css selector", selector)
                             
-                            if button:
+                            if button and button.is_displayed():
                                 Communicator.show_message(f"Found consent button: {selector}")
-                                button.click()
-                                sleep(2)
+                                # Try multiple click methods
+                                try:
+                                    button.click()
+                                except:
+                                    try:
+                                        self.driver.execute_script("arguments[0].click();", button)
+                                    except:
+                                        self.driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('click', {bubbles: true}));", button)
+                                
+                                sleep(3)
+                                consent_clicked = True
                                 break
-                        except:
+                        except Exception as e:
+                            Communicator.show_message(f"Selector {selector} failed: {str(e)}")
                             continue
+                    
+                    if not consent_clicked:
+                        Communicator.show_message("Could not find consent button, trying alternative approach...")
+                        # Try to find any clickable element on the page
+                        try:
+                            all_buttons = self.driver.find_elements("tag name", "button")
+                            for button in all_buttons:
+                                if button.is_displayed():
+                                    button_text = button.text.lower()
+                                    if any(word in button_text for word in ['accept', 'agree', 'accepteren', 'akkoord', 'ok', 'continue']):
+                                        Communicator.show_message(f"Found alternative button: {button_text}")
+                                        button.click()
+                                        sleep(3)
+                                        break
+                        except Exception as e:
+                            Communicator.show_message(f"Alternative approach failed: {str(e)}")
                     
                     # Wait for redirect to actual search page
                     sleep(3)
