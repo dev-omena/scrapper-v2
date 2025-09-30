@@ -117,6 +117,12 @@ class ImprovedScroller:
         # Wait for search results to load
         scrollAbleElement = self.wait_for_search_results()
         
+        # Temporary debug: save page source to file
+        with open('/tmp/page_source.html', 'w', encoding='utf-8') as f:
+            f.write(self.driver.page_source)
+        print("DEBUG: Page source saved to /tmp/page_source.html")
+        Communicator.show_message("DEBUG: Page source saved to /tmp/page_source.html")
+        
         if scrollAbleElement is None:
             Communicator.show_message("ERROR: Could not find search results container")
             print("ERROR: Could not find search results container")
