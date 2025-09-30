@@ -264,14 +264,26 @@ class ImprovedScroller:
                     scroll_attempts = 0  # Reset counter if we're still scrolling
                     
                     # Extract results
-                    allResultsListSoup = BeautifulSoup(
-                        scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
-                    )
-                    
-                    allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
-                    self.__allResultsLinks = [anchorTag.get('href') for anchorTag in allResultsAnchorTags]
-                    
-                    Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
+                    try:
+                        allResultsListSoup = BeautifulSoup(
+                            scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
+                        )
+                        
+                        allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
+                        current_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
+                        
+                        # Initialize or update the results list
+                        if not hasattr(self, '__allResultsLinks'):
+                            self.__allResultsLinks = []
+                        
+                        # Add new links that aren't already in the list
+                        for link in current_links:
+                            if link not in self.__allResultsLinks:
+                                self.__allResultsLinks.append(link)
+                        
+                        Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
+                    except Exception as e:
+                        Communicator.show_message(f"Error extracting results: {str(e)}")
                 
                 scroll_attempts += 1
                 
@@ -283,6 +295,39 @@ class ImprovedScroller:
         if scroll_attempts >= max_scroll_attempts:
             Communicator.show_message("Reached maximum scroll attempts")
         
+        # Final extraction of all results
+        try:
+            # Try to get all results one more time
+            scrollAbleElement = None
+            scrollable_selectors = ["[role='feed']", ".m6QErb", ".section-scrollbox"]
+            
+            for selector in scrollable_selectors:
+                try:
+                    scrollAbleElement = self.driver.find_element("css selector", selector)
+                    if scrollAbleElement:
+                        break
+                except:
+                    continue
+            
+            if scrollAbleElement:
+                allResultsListSoup = BeautifulSoup(
+                    scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
+                )
+                
+                allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
+                final_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
+                
+                # Initialize or update the results list
+                if not hasattr(self, '__allResultsLinks'):
+                    self.__allResultsLinks = []
+                
+                # Add all final links
+                for link in final_links:
+                    if link not in self.__allResultsLinks:
+                        self.__allResultsLinks.append(link)
+        except Exception as e:
+            Communicator.show_message(f"Error in final extraction: {str(e)}")
+
         # Start parsing the results
         if hasattr(self, '__allResultsLinks') and self.__allResultsLinks:
             Communicator.show_message(f"Total results found: {len(self.__allResultsLinks)}")
