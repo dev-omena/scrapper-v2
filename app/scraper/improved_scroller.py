@@ -308,16 +308,26 @@ class ImprovedScroller:
                     print(f"DEBUG: Total unique links found: {len(current_links)}")
                     Communicator.show_message(f"DEBUG: Total unique links found: {len(current_links)}")
                     
-                    # Ensure __allResultsLinks exists
+                    # Ensure __allResultsLinks exists (but don't re-initialize if it already exists)
                     if not hasattr(self, '__allResultsLinks'):
                         self.__allResultsLinks = []
-                        print("DEBUG: Re-initialized __allResultsLinks")
-                        Communicator.show_message("DEBUG: Re-initialized __allResultsLinks")
+                        print("DEBUG: Initialized __allResultsLinks for first time")
+                        Communicator.show_message("DEBUG: Initialized __allResultsLinks for first time")
+                    else:
+                        print(f"DEBUG: __allResultsLinks already exists with {len(self.__allResultsLinks)} items")
+                        Communicator.show_message(f"DEBUG: __allResultsLinks already exists with {len(self.__allResultsLinks)} items")
                     
                     # Add new links to our collection
+                    initial_count = len(self.__allResultsLinks)
+                    new_links_added = 0
+                    
                     for link in current_links:
                         if link not in self.__allResultsLinks:
                             self.__allResultsLinks.append(link)
+                            new_links_added += 1
+                    
+                    print(f"DEBUG: Added {new_links_added} new links, total now: {len(self.__allResultsLinks)}")
+                    Communicator.show_message(f"DEBUG: Added {new_links_added} new links, total now: {len(self.__allResultsLinks)}")
                     
                     if len(self.__allResultsLinks) > 0:
                         Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
