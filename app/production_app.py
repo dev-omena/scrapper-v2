@@ -1,5 +1,5 @@
 """
-DigitalOcean Flask Web Application for Google Maps Scraper
+Production Flask Web Application for Google Maps Scraper
 Optimized for DigitalOcean deployment with headless Chrome
 """
 
@@ -11,7 +11,6 @@ import uuid
 import json
 from datetime import datetime
 import sys
-import glob
 
 # Add the app directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +22,7 @@ from scraper.datasaver import DataSaver
 app = Flask(__name__)
 
 class ProductionCommunicator:
-    """Custom communicator for DigitalOcean web interface"""
+    """Custom communicator for Production web interface"""
     def __init__(self):
         self.messages = []
         self.status = "ready"
@@ -62,402 +61,499 @@ def index():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Google Maps Scraper - DigitalOcean</title>
+        <title>ORIZON Google Maps Scraper</title>
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgdmlld0JveD0iMCAwIDUwMCA1MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIiByeD0iMTAwIiBmaWxsPSIjMjcyODYwIi8+CjxjaXJjbGUgY3g9IjI1MCIgY3k9IjI1MCIgcj0iMTUwIiBmaWxsPSIjZjhjODAwIi8+CjxjaXJjbGUgY3g9IjI1MCIgY3k9IjI1MCIgcj0iNzUiIGZpbGw9IiMyNzI4NjAiLz4KPGNpcmNsZSBjeD0iNDIwIiBjeT0iMTMwIiByPSIxNSIgZmlsbD0iI2Y4Yzg0NSIgc3Ryb2tlPSIjZjhjODAwIiBzdHJva2Utd2lkdGg9IjMiLz4KPC9zdmc+">
         <style>
             * {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
             }
-            
+
             body {
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #272860 0%, #1a1b4b 100%);
+                color: white;
                 min-height: 100vh;
+                overflow-x: hidden;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
                 padding: 20px;
             }
-            
-            .container {
-                max-width: 900px;
-                margin: 0 auto;
-                background: white;
-                border-radius: 15px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                overflow: hidden;
-            }
-            
+
             .header {
-                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-                color: white;
-                padding: 30px;
                 text-align: center;
+                margin-bottom: 40px;
+                padding: 30px 0;
             }
-            
-            .header h1 {
-                font-size: 2.5em;
+
+            .logo {
+                max-width: 200px;
+                height: auto;
+                margin-bottom: 20px;
+            }
+
+            .title {
+                font-size: 2.5rem;
+                font-weight: 700;
+                color: #f8c800;
                 margin-bottom: 10px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             }
-            
-            .header p {
-                font-size: 1.2em;
-                opacity: 0.9;
+
+            .subtitle {
+                font-size: 1.2rem;
+                color: #e0e0e0;
+                font-weight: 300;
             }
-            
-            .content {
+
+            .main-card {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 20px;
                 padding: 40px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                margin-bottom: 30px;
             }
-            
+
             .form-group {
                 margin-bottom: 25px;
             }
-            
-            label {
+
+            .form-label {
                 display: block;
-                margin-bottom: 8px;
+                font-size: 1.1rem;
                 font-weight: 600;
-                color: #333;
-                font-size: 1.1em;
+                color: #f8c800;
+                margin-bottom: 8px;
             }
-            
-            input, select {
+
+            .form-input {
                 width: 100%;
                 padding: 15px;
-                border: 2px solid #e1e1e1;
-                border-radius: 8px;
-                font-size: 16px;
-                transition: border-color 0.3s;
+                font-size: 1rem;
+                border: 2px solid rgba(248, 200, 0, 0.3);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+                transition: all 0.3s ease;
             }
-            
-            input:focus, select:focus {
+
+            .form-input:focus {
                 outline: none;
-                border-color: #4CAF50;
+                border-color: #f8c800;
+                background: rgba(255, 255, 255, 0.15);
+                box-shadow: 0 0 20px rgba(248, 200, 0, 0.3);
             }
-            
+
+            .form-input::placeholder {
+                color: rgba(255, 255, 255, 0.6);
+            }
+
             .checkbox-group {
                 display: flex;
                 align-items: center;
-                margin: 20px 0;
+                gap: 10px;
+                margin-bottom: 20px;
             }
-            
-            .checkbox-group input[type="checkbox"] {
-                width: auto;
-                margin-right: 10px;
+
+            .checkbox {
+                width: 20px;
+                height: 20px;
+                accent-color: #f8c800;
             }
-            
-            button {
-                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-                color: white;
-                padding: 15px 30px;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 18px;
-                font-weight: 600;
-                transition: transform 0.2s;
+
+            .start-button {
                 width: 100%;
+                padding: 18px;
+                font-size: 1.2rem;
+                font-weight: 700;
+                background: linear-gradient(45deg, #f8c800, #ffd700);
+                color: #272860;
+                border: none;
+                border-radius: 15px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                text-transform: uppercase;
+                letter-spacing: 1px;
             }
-            
-            button:hover:not(:disabled) {
+
+            .start-button:hover {
                 transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(248, 200, 0, 0.4);
             }
-            
-            button:disabled {
-                background: #cccccc;
+
+            .start-button:active {
+                transform: translateY(0);
+            }
+
+            .start-button:disabled {
+                background: #666;
+                color: #ccc;
                 cursor: not-allowed;
                 transform: none;
+                box-shadow: none;
             }
-            
-            .status-section {
+
+            .progress-section {
+                display: none;
                 margin-top: 30px;
-                padding: 20px;
-                background: #f8f9fa;
-                border-radius: 8px;
-                border-left: 4px solid #4CAF50;
             }
-            
-            .status {
-                font-size: 1.2em;
-                font-weight: 600;
+
+            .progress-bar {
+                width: 100%;
+                height: 15px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 10px;
+                overflow: hidden;
                 margin-bottom: 15px;
             }
-            
-            .status.ready { color: #4CAF50; }
-            .status.running { color: #2196F3; }
-            .status.completed { color: #4CAF50; }
-            .status.error { color: #f44336; }
-            
-            .messages {
-                max-height: 300px;
-                overflow-y: auto;
-                background: #2c3e50;
-                color: #ecf0f1;
-                padding: 15px;
-                border-radius: 5px;
+
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #f8c800, #ffd700);
+                width: 0%;
+                transition: width 0.3s ease;
+                border-radius: 10px;
+            }
+
+            .status-text {
+                text-align: center;
+                font-size: 1.1rem;
+                color: #f8c800;
+                font-weight: 600;
+            }
+
+            .results-section {
+                display: none;
+                margin-top: 30px;
+            }
+
+            .download-button {
+                display: inline-block;
+                padding: 12px 25px;
+                background: linear-gradient(45deg, #f8c800, #ffd700);
+                color: #272860;
+                text-decoration: none;
+                border-radius: 10px;
+                font-weight: 600;
+                margin-right: 15px;
+                margin-bottom: 10px;
+                transition: all 0.3s ease;
+            }
+
+            .download-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(248, 200, 0, 0.3);
+            }
+
+            .footer {
+                text-align: center;
+                padding: 20px;
+                color: rgba(255, 255, 255, 0.6);
+                font-size: 0.9rem;
+            }
+
+            .orizon-accent {
+                color: #f8c800;
+            }
+
+            /* Live extraction styles */
+            .live-extraction-box {
+                max-height: 350px; 
+                overflow-y: auto; 
+                background: rgba(0,0,0,0.3); 
+                border-radius: 10px; 
+                padding: 15px; 
+                border: 1px solid rgba(248, 200, 0, 0.3);
                 font-family: 'Courier New', monospace;
                 font-size: 14px;
                 line-height: 1.4;
             }
-            
+
             .message {
                 margin-bottom: 5px;
                 padding: 2px 0;
             }
-            
+
             .message.error { color: #e74c3c; }
             .message.success { color: #2ecc71; }
             .message.info { color: #3498db; }
-            
-            .download-section {
-                margin-top: 20px;
-                padding: 15px;
-                background: #e8f5e8;
-                border-radius: 8px;
-                text-align: center;
-                display: none;
+
+            /* Scrollbar styling */
+            .live-extraction-box::-webkit-scrollbar {
+                width: 8px;
             }
-            
-            .download-btn {
-                background: #2196F3;
-                color: white;
-                padding: 10px 20px;
-                text-decoration: none;
-                border-radius: 5px;
-                display: inline-block;
-                margin: 5px;
-                cursor: pointer;
+
+            .live-extraction-box::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
             }
-            
-            .download-btn:hover {
-                background: #1976D2;
+
+            .live-extraction-box::-webkit-scrollbar-thumb {
+                background: #f8c800;
+                border-radius: 4px;
             }
-            
-            .info-box {
-                background: #e3f2fd;
-                border: 1px solid #2196F3;
-                border-radius: 8px;
-                padding: 15px;
-                margin-bottom: 20px;
+
+            .live-extraction-box::-webkit-scrollbar-thumb:hover {
+                background: #ffd700;
             }
-            
-            .info-box h3 {
-                color: #1976D2;
-                margin-bottom: 10px;
-            }
-            
-            .file-list {
-                margin-top: 10px;
-                text-align: left;
-            }
-            
-            .file-item {
-                background: white;
-                padding: 10px;
-                margin: 5px 0;
-                border-radius: 5px;
-                border: 1px solid #ddd;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            
-            .file-name {
-                font-weight: 600;
-                color: #333;
-            }
-            
-            .file-size {
-                color: #666;
-                font-size: 0.9em;
+
+            @media (max-width: 768px) {
+                .title {
+                    font-size: 2rem;
+                }
+                
+                .main-card {
+                    padding: 25px;
+                }
             }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🗺️ Google Maps Scraper</h1>
-                <p>Deployed on DigitalOcean - Team Access Portal</p>
-                <p style="font-size: 0.8em; opacity: 0.7;">Version: v2.1.3 - Debug Enhanced</p>
+                <!-- ORIZON Logo SVG -->
+                <svg class="logo" width="150" height="60" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Main O Shape -->
+                    <circle cx="60" cy="60" r="45" fill="#f8c800" stroke="none"/>
+                    <circle cx="60" cy="60" r="22" fill="#272860"/>
+                    
+                    <!-- Copyright symbol -->
+                    <circle cx="220" cy="35" r="8" fill="none" stroke="#f8c800" stroke-width="2"/>
+                    <text x="220" y="40" text-anchor="middle" fill="#f8c800" font-family="Arial, sans-serif" font-size="10" font-weight="bold">©</text>
+                    
+                    <!-- Text "RIZON" -->
+                    <text x="140" y="75" fill="#f8c800" font-family="Arial, sans-serif" font-size="36" font-weight="bold">RIZON</text>
+                </svg>
+                <h1 class="title">Multi-Purpose Scraper</h1>
+                <p class="subtitle">Extract business data and emails with ease</p>
             </div>
-            
-            <div class="content">
-                <div class="info-box">
-                    <h3>ℹ️ DigitalOcean Deployment Info</h3>
-                    <p>This scraper runs in headless mode on DigitalOcean. All scraping operations are performed in the background without a visible browser window.</p>
-                </div>
-                
-                <form id="scrapeForm">
+
+            <div class="main-card">
+                <form id="scraperForm">
                     <div class="form-group">
-                        <label for="search_query">Search Query:</label>
-                        <input type="text" id="search_query" name="search_query" 
-                               placeholder="e.g., restaurants in New York, coffee shops in London" required>
+                        <label class="form-label" for="search_query">Search Query</label>
+                        <input type="text" id="search_query" name="search_query" class="form-input" 
+                               placeholder="e.g., restaurants in Cairo, Egypt" required>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="output_format">Output Format:</label>
-                        <select id="output_format" name="output_format">
-                            <option value="excel">Excel (.xlsx)</option>
-                            <option value="csv">CSV (.csv)</option>
-                            <option value="json">JSON (.json)</option>
-                        </select>
-                    </div>
-                    
+
                     <div class="checkbox-group">
-                        <input type="checkbox" id="headless_mode" name="headless_mode" checked disabled>
-                        <label for="headless_mode">Headless Mode (Required for Server)</label>
+                        <input type="checkbox" id="headless" name="headless" class="checkbox" checked>
+                        <label for="headless" class="form-label">Run in headless mode (recommended)</label>
                     </div>
-                    
-                    <button type="submit" id="submitBtn">Start Scraping</button>
+
+                    <button type="submit" class="start-button" id="startButton">
+                        START SCRAPING
+                    </button>
                 </form>
-                
-                <div class="status-section">
-                    <div class="status" id="status">Ready</div>
-                    <div id="messages" class="messages"></div>
+
+                <div class="progress-section" id="progressSection">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="status-text" id="statusText">Initializing...</div>
+                    
+                    <!-- Live extraction display -->
+                    <div id="liveExtractionContainer" style="margin-top: 20px; display: none;">
+                        <h4 style="color: #f8c800; margin-bottom: 5px;">📊 Live Extraction Progress</h4>
+                        <p style="color: #ccc; margin-bottom: 15px; font-size: 0.85rem;">Real-time scraping progress and debug information</p>
+                        <div id="liveExtractionBox" class="live-extraction-box">
+                            <!-- Live extraction data will appear here -->
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="download-section" id="downloadSection">
-                    <h3>📁 Download Results</h3>
-                    <p>Your scraping is complete! Choose a file to download:</p>
-                    <div id="fileList" class="file-list"></div>
+
+                <div class="results-section" id="resultsSection">
+                    <h3 style="color: #f8c800; margin-bottom: 15px;">Scraping Complete!</h3>
+                    <p style="margin-bottom: 20px;" id="resultsText">Your data has been successfully extracted and saved.</p>
+                    
+                    <!-- Download buttons -->
+                    <div style="margin-bottom: 30px;">
+                        <a href="#" class="download-button" id="downloadExcel">📊 Download Excel</a>
+                        <a href="#" class="download-button" id="downloadCsv">📄 Download CSV</a>
+                        <a href="#" class="download-button" id="downloadJson">📋 Download JSON</a>
+                    </div>
                 </div>
+            </div>
+
+            <div class="footer">
+                <p>&copy; 2025 <span class="orizon-accent">ORIZON</span>. All rights reserved.</p>
             </div>
         </div>
 
         <script>
-            const form = document.getElementById('scrapeForm');
-            const submitBtn = document.getElementById('submitBtn');
-            const status = document.getElementById('status');
-            const messages = document.getElementById('messages');
-            const downloadSection = document.getElementById('downloadSection');
-            const fileList = document.getElementById('fileList');
-            
-            let currentJobId = null;
-            let pollInterval = null;
-            
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const formData = new FormData(form);
-                const data = {
-                    search_query: formData.get('search_query'),
-                    output_format: formData.get('output_format'),
-                    healdessmode: 1  // Always headless on server
-                };
-                
-                submitBtn.disabled = true;
-                status.textContent = 'Starting...';
-                status.className = 'status running';
-                downloadSection.style.display = 'none';
-                
-                try {
-                    const response = await fetch('/scrape', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
+            class GoogleMapsScraper {
+                constructor() {
+                    this.form = document.getElementById('scraperForm');
+                    this.startButton = document.getElementById('startButton');
+                    this.progressSection = document.getElementById('progressSection');
+                    this.resultsSection = document.getElementById('resultsSection');
+                    this.progressFill = document.getElementById('progressFill');
+                    this.statusText = document.getElementById('statusText');
+                    this.downloadExcel = document.getElementById('downloadExcel');
+                    this.downloadCsv = document.getElementById('downloadCsv');
+                    this.downloadJson = document.getElementById('downloadJson');
+                    this.extractedData = null;
                     
-                    const result = await response.json();
-                    console.log(result);
-                    
-                    if (result.status === 'started') {
-                        currentJobId = result.job_id;
-                        status.textContent = 'Scraping in progress...';
-                        status.className = 'status running';
-                        pollStatus();
-                    } else {
-                        status.textContent = 'Error starting scraping';
-                        status.className = 'status error';
-                        submitBtn.disabled = false;
-                    }
-                    
-                } catch (error) {
-                    console.error('Error:', error);
-                    status.textContent = 'Error starting scraping';
-                    status.className = 'status error';
-                    submitBtn.disabled = false;
+                    this.init();
                 }
-            });
-            
-            function pollStatus() {
-                if (pollInterval) clearInterval(pollInterval);
-                
-                pollInterval = setInterval(async () => {
+
+                init() {
+                    this.form.addEventListener('submit', this.handleSubmit.bind(this));
+                }
+
+                async handleSubmit(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this.form);
+                    const data = {
+                        search_query: formData.get('search_query'),
+                        output_format: 'excel',
+                        healdessmode: formData.has('headless') ? 1 : 0
+                    };
+
+                    this.startScraping(data);
+                }
+
+                async startScraping(data) {
+                    // Disable form and show progress
+                    this.startButton.disabled = true;
+                    this.startButton.textContent = 'Scraping...';
+                    this.progressSection.style.display = 'block';
+                    this.resultsSection.style.display = 'none';
+
                     try {
-                        const response = await fetch('/status');
-                        const data = await response.json();
-                        
-                        status.textContent = data.status;
-                        status.className = `status ${data.status}`;
-                        
-                        // Update messages
-                        messages.innerHTML = data.messages.map(msg => {
-                            let className = 'message';
-                            if (msg.includes('ERROR')) className += ' error';
-                            else if (msg.includes('completed') || msg.includes('success')) className += ' success';
-                            else className += ' info';
-                            
-                            return `<div class="${className}">${msg}</div>`;
-                        }).join('');
-                        
-                        messages.scrollTop = messages.scrollHeight;
-                        
-                        if (data.status === 'completed') {
-                            status.textContent = 'Completed! Download your results below.';
-                            status.className = 'status completed';
-                            submitBtn.disabled = false;
-                            downloadSection.style.display = 'block';
-                            
-                            // Update file list
-                            updateFileList(data.available_files || []);
-                            
-                            clearInterval(pollInterval);
-                        } else if (data.status === 'error') {
-                            status.textContent = 'Error occurred during scraping';
-                            status.className = 'status error';
-                            submitBtn.disabled = false;
-                            clearInterval(pollInterval);
+                        // Start the scraping process
+                        const response = await fetch('/scrape', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(data)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to start scraping');
+                        }
+
+                        const result = await response.json();
+                        console.log(result);
+
+                        if (result.status === 'started') {
+                            this.statusText.textContent = 'Scraping in progress...';
+                            this.pollStatus();
+                        } else {
+                            this.statusText.textContent = 'Error starting scraping';
+                            this.startButton.disabled = false;
+                            this.startButton.textContent = 'START SCRAPING';
                         }
                         
                     } catch (error) {
-                        console.error('Status polling error:', error);
-                        status.textContent = 'Connection error';
-                        status.className = 'status error';
-                        submitBtn.disabled = false;
-                        clearInterval(pollInterval);
+                        console.error('Error:', error);
+                        this.statusText.textContent = 'Error starting scraping';
+                        this.startButton.disabled = false;
+                        this.startButton.textContent = 'START SCRAPING';
                     }
-                }, 3000);
-            }
-            
-            function updateFileList(files) {
-                if (files.length === 0) {
-                    fileList.innerHTML = '<p>No files available for download.</p>';
-                    return;
                 }
-                
-                fileList.innerHTML = files.map(file => `
-                    <div class="file-item">
-                        <div>
-                            <div class="file-name">${file}</div>
-                            <div class="file-size">Click to download</div>
-                        </div>
-                        <a href="/download/${encodeURIComponent(file)}" class="download-btn" download>
-                            Download
-                        </a>
-                    </div>
-                `).join('');
-            }
-            
-            // Load available files on page load
-            window.addEventListener('load', async () => {
-                try {
-                    const response = await fetch('/files');
-                    const data = await response.json();
-                    if (data.files && data.files.length > 0) {
-                        downloadSection.style.display = 'block';
-                        updateFileList(data.files);
+
+                async pollStatus() {
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            const response = await fetch('/status');
+                            const data = await response.json();
+                            
+                            this.statusText.textContent = data.status;
+                            
+                            // Update progress bar based on status
+                            if (data.status === 'running') {
+                                this.progressFill.style.width = '70%';
+                            } else if (data.status === 'completed') {
+                                this.progressFill.style.width = '100%';
+                            }
+                            
+                            // Update live extraction messages
+                            if (data.messages && data.messages.length > 0) {
+                                this.showLiveExtraction(data.messages);
+                            }
+                            
+                            if (data.status === 'completed') {
+                                this.showResults(data);
+                                clearInterval(pollInterval);
+                            } else if (data.status === 'error') {
+                                this.statusText.textContent = 'Error occurred during scraping';
+                                this.startButton.disabled = false;
+                                this.startButton.textContent = 'START SCRAPING';
+                                clearInterval(pollInterval);
+                            }
+                            
+                        } catch (error) {
+                            console.error('Status polling error:', error);
+                        }
+                    }, 3000);
+                }
+
+                showLiveExtraction(messages) {
+                    const container = document.getElementById('liveExtractionContainer');
+                    const box = document.getElementById('liveExtractionBox');
+                    
+                    // Show the container
+                    container.style.display = 'block';
+                    
+                    // Update the live extraction box
+                    box.innerHTML = messages.map(msg => {
+                        let className = 'message';
+                        if (msg.includes('ERROR')) className += ' error';
+                        else if (msg.includes('completed') || msg.includes('success')) className += ' success';
+                        else className += ' info';
+                        
+                        return `<div class="${className}">${msg}</div>`;
+                    }).join('');
+                    
+                    box.scrollTop = box.scrollHeight;
+                }
+
+                showResults(data) {
+                    this.progressSection.style.display = 'none';
+                    this.resultsSection.style.display = 'block';
+                    
+                    // Reset button state
+                    this.startButton.disabled = false;
+                    this.startButton.textContent = 'START SCRAPING';
+                    
+                    // Update results text
+                    const resultsText = document.querySelector('#resultsText');
+                    resultsText.textContent = 'Your scraping is complete! Download your results below.';
+                    
+                    // Set download links
+                    const availableFiles = data.available_files || [];
+                    if (availableFiles.length > 0) {
+                        availableFiles.forEach(file => {
+                            if (file.endsWith('.xlsx')) {
+                                this.downloadExcel.href = `/download/${file}`;
+                                this.downloadExcel.textContent = `📊 Download ${file}`;
+                            } else if (file.endsWith('.csv')) {
+                                this.downloadCsv.href = `/download/${file}`;
+                                this.downloadCsv.textContent = `📄 Download ${file}`;
+                            } else if (file.endsWith('.json')) {
+                                this.downloadJson.href = `/download/${file}`;
+                                this.downloadJson.textContent = `📋 Download ${file}`;
+                            }
+                        });
+                    } else if (data.output_file) {
+                        this.downloadExcel.href = `/download/${data.output_file}`;
+                        this.downloadExcel.textContent = `📊 Download ${data.output_file}`;
                     }
-                } catch (error) {
-                    console.error('Error loading files:', error);
                 }
+            }
+
+            // Initialize the scraper when page loads
+            document.addEventListener('DOMContentLoaded', () => {
+                window.scraperInstance = new GoogleMapsScraper();
             });
         </script>
     </body>
@@ -496,7 +592,8 @@ def scrape():
                 production_comm.show_message("Initializing Chrome in headless mode...")
                 production_comm.show_message("Note: Arabic and international searches are supported")
                 
-                # Set up communicator for Production environment
+                # Set up communicator for Production environment FIRST
+                # Create a mock frontend object for the communicator
                 class ProductionFrontend:
                     def __init__(self, comm):
                         self.comm = comm
@@ -520,7 +617,7 @@ def scrape():
                 production_backend = ProductionBackend(search_query)
                 Communicator.set_backend_object(production_backend)
                 
-                # Now create backend with headless mode
+                # Now create backend with headless mode (note: original code has typo 'healdessmode')
                 backend = Backend(search_query, output_format, healdessmode=healdessmode)
                 
                 # Run scraping
@@ -528,6 +625,7 @@ def scrape():
                 backend.mainscraping()
                 
                 # The scraping process will handle data saving automatically
+                # through the existing DataSaver in the scraper
                 production_comm.show_message("Data saving completed automatically")
                 
                 production_comm.status = "completed"
@@ -613,23 +711,12 @@ def health():
         "timestamp": datetime.now().isoformat()
     })
 
-@app.route('/api/jobs')
-def get_jobs():
-    """Get list of recent jobs"""
-    return jsonify({
-        "current_job": {
-            "id": production_comm.job_id,
-            "status": production_comm.status,
-            "query": getattr(production_comm, 'search_query', None)
-        }
-    })
-
 if __name__ == '__main__':
-    # DigitalOcean deployment
+    # DigitalOcean will set PORT environment variable
     port = int(os.environ.get('PORT', 8000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
     
-    print(f"Starting Production Flask app on port {port}")
+    print(f"Starting DigitalOcean Flask app on port {port}")
     print(f"Debug mode: {debug}")
     
     app.run(host='0.0.0.0', port=port, debug=debug)
