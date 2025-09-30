@@ -188,6 +188,11 @@ class ImprovedScroller:
         Communicator.show_message("DEBUG: Starting scroller.scroll() method")
         print("DEBUG: Starting scroller.scroll() method")
         
+        # Initialize results collection
+        self.__allResultsLinks = []
+        Communicator.show_message("DEBUG: Initialized __allResultsLinks")
+        print("DEBUG: Initialized __allResultsLinks")
+        
         # Wait for search results to load
         scrollAbleElement = self.wait_for_search_results()
         
@@ -234,6 +239,27 @@ class ImprovedScroller:
                 new_height = self.driver.execute_script(
                     "return arguments[0].scrollHeight", scrollAbleElement
                 )
+                
+                # Collect results during scrolling
+                try:
+                    allResultsListSoup = BeautifulSoup(
+                        scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
+                    )
+                    allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
+                    current_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
+                    
+                    # Add new links to our collection
+                    for link in current_links:
+                        if link not in self.__allResultsLinks:
+                            self.__allResultsLinks.append(link)
+                    
+                    if len(self.__allResultsLinks) > 0:
+                        Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
+                        print(f"DEBUG: Collected {len(self.__allResultsLinks)} results so far")
+                        
+                except Exception as e:
+                    Communicator.show_message(f"Error collecting results: {str(e)}")
+                    print(f"DEBUG: Error collecting results: {str(e)}")
                 
                 if new_height == last_height:
                     # Check if we've reached the end
@@ -320,14 +346,13 @@ class ImprovedScroller:
                 allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
                 final_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
                 
-                # Initialize or update the results list
-                if not hasattr(self, '__allResultsLinks'):
-                    self.__allResultsLinks = []
-                
-                # Add all final links
+                # Add all final links (ensure no duplicates)
                 for link in final_links:
                     if link not in self.__allResultsLinks:
                         self.__allResultsLinks.append(link)
+                
+                Communicator.show_message(f"Final extraction added {len(final_links)} links, total: {len(self.__allResultsLinks)}")
+                print(f"DEBUG: Final extraction added {len(final_links)} links, total: {len(self.__allResultsLinks)}")
         except Exception as e:
             Communicator.show_message(f"Error in final extraction: {str(e)}")
 

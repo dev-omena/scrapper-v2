@@ -510,7 +510,7 @@ def status():
     
     return jsonify({
         "status": railway_comm.status,
-        "messages": railway_comm.messages[-20:],  # Last 20 messages
+        "messages": railway_comm.messages[-50:],  # Last 50 messages to show more debug info
         "job_id": railway_comm.job_id,
         "output_file": railway_comm.output_file,
         "available_files": output_files
