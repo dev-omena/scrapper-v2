@@ -530,23 +530,37 @@ def index():
                     resultsText.textContent = 'Your scraping is complete! Download your results below.';
                     
                     // Set download links
+                    console.log('Available files:', data.available_files);
+                    console.log('Output file:', data.output_file);
+                    
                     const availableFiles = data.available_files || [];
                     if (availableFiles.length > 0) {
+                        // Show all available files
                         availableFiles.forEach(file => {
                             if (file.endsWith('.xlsx')) {
-                                this.downloadExcel.href = `/download/${file}`;
+                                this.downloadExcel.href = `/download/${encodeURIComponent(file)}`;
                                 this.downloadExcel.textContent = `📊 Download ${file}`;
+                                this.downloadExcel.style.display = 'inline-block';
                             } else if (file.endsWith('.csv')) {
-                                this.downloadCsv.href = `/download/${file}`;
+                                this.downloadCsv.href = `/download/${encodeURIComponent(file)}`;
                                 this.downloadCsv.textContent = `📄 Download ${file}`;
+                                this.downloadCsv.style.display = 'inline-block';
                             } else if (file.endsWith('.json')) {
-                                this.downloadJson.href = `/download/${file}`;
+                                this.downloadJson.href = `/download/${encodeURIComponent(file)}`;
                                 this.downloadJson.textContent = `📋 Download ${file}`;
+                                this.downloadJson.style.display = 'inline-block';
                             }
                         });
                     } else if (data.output_file) {
-                        this.downloadExcel.href = `/download/${data.output_file}`;
+                        this.downloadExcel.href = `/download/${encodeURIComponent(data.output_file)}`;
                         this.downloadExcel.textContent = `📊 Download ${data.output_file}`;
+                        this.downloadExcel.style.display = 'inline-block';
+                    } else {
+                        // No files available
+                        this.downloadExcel.textContent = 'No files available';
+                        this.downloadExcel.style.display = 'none';
+                        this.downloadCsv.style.display = 'none';
+                        this.downloadJson.style.display = 'none';
                     }
                 }
             }
@@ -628,6 +642,20 @@ def scrape():
                 # through the existing DataSaver in the scraper
                 production_comm.show_message("Data saving completed automatically")
                 
+                # Check what files were actually created
+                if os.path.exists('output'):
+                    created_files = [f for f in os.listdir('output') if f.endswith(('.xlsx', '.csv', '.json'))]
+                    if created_files:
+                        # Get the most recent file
+                        latest_file = max(created_files, key=lambda x: os.path.getctime(os.path.join('output', x)))
+                        production_comm.output_file = latest_file
+                        production_comm.show_message(f"Output file created: {latest_file}")
+                        production_comm.show_message(f"All available files: {', '.join(created_files)}")
+                    else:
+                        production_comm.show_message("No output files found in output directory")
+                else:
+                    production_comm.show_message("Output directory does not exist")
+                
                 production_comm.status = "completed"
                 production_comm.show_message(f"Job {job_id} completed successfully!")
                 production_comm.show_message("Check the output folder for your scraped data")
@@ -701,6 +729,45 @@ def download_file(filename):
     except Exception as e:
         print(f"DEBUG: Download error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/debug/files')
+def debug_files():
+    """Debug endpoint to check files and permissions"""
+    debug_info = {
+        "output_dir_exists": os.path.exists('output'),
+        "current_working_dir": os.getcwd(),
+        "output_dir_path": os.path.abspath('output'),
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    if os.path.exists('output'):
+        try:
+            all_files = os.listdir('output')
+            debug_info["all_files"] = all_files
+            debug_info["file_count"] = len(all_files)
+            
+            # Check file details
+            file_details = []
+            for file in all_files:
+                file_path = os.path.join('output', file)
+                if os.path.isfile(file_path):
+                    stat = os.stat(file_path)
+                    file_details.append({
+                        "name": file,
+                        "size": stat.st_size,
+                        "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        "readable": os.access(file_path, os.R_OK),
+                        "path": file_path
+                    })
+            debug_info["file_details"] = file_details
+            
+        except Exception as e:
+            debug_info["error"] = str(e)
+    else:
+        debug_info["error"] = "Output directory does not exist"
+    
+    return jsonify(debug_info)
 
 @app.route('/health')
 def health():
