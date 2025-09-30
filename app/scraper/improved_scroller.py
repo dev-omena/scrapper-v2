@@ -17,7 +17,14 @@ class ImprovedScroller:
         self.parser = Parser(self.driver)
 
     def start_parsing(self):
+        Communicator.show_message("DEBUG: Starting parsing process")
+        print("DEBUG: Starting parsing process")
+        print(f"DEBUG: __allResultsLinks length before parsing: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        Communicator.show_message(f"DEBUG: __allResultsLinks length before parsing: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        
         self.__init_parser()
+        print(f"DEBUG: About to call parser.main with {len(self.__allResultsLinks)} links")
+        Communicator.show_message(f"DEBUG: About to call parser.main with {len(self.__allResultsLinks)} links")
         self.parser.main(self.__allResultsLinks)
     
     def create_mock_data(self):
@@ -324,6 +331,10 @@ class ImprovedScroller:
         if scroll_attempts >= max_scroll_attempts:
             Communicator.show_message("Reached maximum scroll attempts")
         
+        Communicator.show_message("Scrolling completed")
+        print(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        Communicator.show_message(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        
         # Final extraction of all results
         try:
             # Try to get all results one more time
@@ -360,14 +371,35 @@ class ImprovedScroller:
         Communicator.show_message("DEBUG: Checking if we have results to parse")
         print("DEBUG: Checking if we have results to parse")
         print(f"DEBUG: hasattr __allResultsLinks: {hasattr(self, '__allResultsLinks')}")
+        
         if hasattr(self, '__allResultsLinks'):
             print(f"DEBUG: __allResultsLinks length: {len(self.__allResultsLinks)}")
-            print(f"DEBUG: First few links: {self.__allResultsLinks[:3] if self.__allResultsLinks else []}")
+            print(f"DEBUG: __allResultsLinks type: {type(self.__allResultsLinks)}")
+            print(f"DEBUG: __allResultsLinks is None: {self.__allResultsLinks is None}")
+            print(f"DEBUG: __allResultsLinks is empty: {len(self.__allResultsLinks) == 0 if self.__allResultsLinks else 'N/A'}")
+            if self.__allResultsLinks:
+                print(f"DEBUG: First few links: {self.__allResultsLinks[:3]}")
+                Communicator.show_message(f"DEBUG: Found {len(self.__allResultsLinks)} links to parse")
+            else:
+                print("DEBUG: __allResultsLinks is empty list")
+                Communicator.show_message("DEBUG: __allResultsLinks is empty list")
         
-        if hasattr(self, '__allResultsLinks') and self.__allResultsLinks:
+        # Check multiple conditions
+        has_attr = hasattr(self, '__allResultsLinks')
+        not_none = has_attr and self.__allResultsLinks is not None
+        not_empty = not_none and len(self.__allResultsLinks) > 0
+        
+        print(f"DEBUG: Conditions - has_attr: {has_attr}, not_none: {not_none}, not_empty: {not_empty}")
+        Communicator.show_message(f"DEBUG: Conditions - has_attr: {has_attr}, not_none: {not_none}, not_empty: {not_empty}")
+        
+        if has_attr and self.__allResultsLinks and len(self.__allResultsLinks) > 0:
             Communicator.show_message(f"Total results found: {len(self.__allResultsLinks)}")
             print(f"DEBUG: Starting parsing with {len(self.__allResultsLinks)} links")
             self.start_parsing()
         else:
             Communicator.show_message("No results to parse")
-            print("DEBUG: No results to parse - __allResultsLinks is empty or doesn't exist")
+            print("DEBUG: No results to parse - conditions not met")
+            print(f"DEBUG: hasattr: {has_attr}, __allResultsLinks exists: {hasattr(self, '__allResultsLinks')}")
+            if hasattr(self, '__allResultsLinks'):
+                print(f"DEBUG: __allResultsLinks value: {self.__allResultsLinks}")
+                print(f"DEBUG: __allResultsLinks length: {len(self.__allResultsLinks)}")
