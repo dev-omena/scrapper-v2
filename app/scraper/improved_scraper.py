@@ -250,7 +250,11 @@ class ImprovedBackend(Base):
                     print("DEBUG: Successfully reached search results page!")
             
             # Start scrolling and scraping
+            Communicator.show_message("DEBUG: About to call scroller.scroll()")
+            print("DEBUG: About to call scroller.scroll()")
             self.scroller.scroll()
+            Communicator.show_message("DEBUG: Scroller.scroll() completed")
+            print("DEBUG: Scroller.scroll() completed")
             
         except Exception as e:
             Communicator.show_message(f"Error occurred while scraping. Error: {str(e)}")

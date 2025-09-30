@@ -561,7 +561,7 @@ def status():
     
     return jsonify({
         "status": production_comm.status,
-        "messages": production_comm.messages[-20:],  # Last 20 messages
+        "messages": production_comm.messages[-50:],  # Last 50 messages to show more debug info
         "job_id": production_comm.job_id,
         "output_file": production_comm.output_file,
         "available_files": output_files

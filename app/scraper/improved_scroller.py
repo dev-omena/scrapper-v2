@@ -185,6 +185,9 @@ class ImprovedScroller:
     def scroll(self):
         """Improved scrolling with better error handling"""
         
+        Communicator.show_message("DEBUG: Starting scroller.scroll() method")
+        print("DEBUG: Starting scroller.scroll() method")
+        
         # Wait for search results to load
         scrollAbleElement = self.wait_for_search_results()
         
@@ -329,8 +332,17 @@ class ImprovedScroller:
             Communicator.show_message(f"Error in final extraction: {str(e)}")
 
         # Start parsing the results
+        Communicator.show_message("DEBUG: Checking if we have results to parse")
+        print("DEBUG: Checking if we have results to parse")
+        print(f"DEBUG: hasattr __allResultsLinks: {hasattr(self, '__allResultsLinks')}")
+        if hasattr(self, '__allResultsLinks'):
+            print(f"DEBUG: __allResultsLinks length: {len(self.__allResultsLinks)}")
+            print(f"DEBUG: First few links: {self.__allResultsLinks[:3] if self.__allResultsLinks else []}")
+        
         if hasattr(self, '__allResultsLinks') and self.__allResultsLinks:
             Communicator.show_message(f"Total results found: {len(self.__allResultsLinks)}")
+            print(f"DEBUG: Starting parsing with {len(self.__allResultsLinks)} links")
             self.start_parsing()
         else:
             Communicator.show_message("No results to parse")
+            print("DEBUG: No results to parse - __allResultsLinks is empty or doesn't exist")

@@ -234,6 +234,8 @@ class Parser(Base):
         Communicator.show_message(
             "Scrolling is done. Now going to scrape each location"
         )
+        print(f"DEBUG: Parser.main() called with {len(allResultsLinks)} links")
+        Communicator.show_message(f"DEBUG: Parser received {len(allResultsLinks)} links to process")
         try:
             for idx, resultLink in enumerate(allResultsLinks):
                 if Common.close_thread_is_set():
