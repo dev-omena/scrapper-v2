@@ -255,6 +255,15 @@ class ImprovedScroller:
                     allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
                     current_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
                     
+                    print(f"DEBUG: Found {len(current_links)} links in this scroll iteration")
+                    Communicator.show_message(f"DEBUG: Found {len(current_links)} links in this scroll iteration")
+                    
+                    # Ensure __allResultsLinks exists
+                    if not hasattr(self, '__allResultsLinks'):
+                        self.__allResultsLinks = []
+                        print("DEBUG: Re-initialized __allResultsLinks")
+                        Communicator.show_message("DEBUG: Re-initialized __allResultsLinks")
+                    
                     # Add new links to our collection
                     for link in current_links:
                         if link not in self.__allResultsLinks:
@@ -267,6 +276,8 @@ class ImprovedScroller:
                 except Exception as e:
                     Communicator.show_message(f"Error collecting results: {str(e)}")
                     print(f"DEBUG: Error collecting results: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                 
                 if new_height == last_height:
                     # Check if we've reached the end
