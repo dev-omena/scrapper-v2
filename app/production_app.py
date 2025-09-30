@@ -276,6 +276,7 @@ def index():
             <div class="header">
                 <h1>🗺️ Google Maps Scraper</h1>
                 <p>Deployed on DigitalOcean - Team Access Portal</p>
+                <p style="font-size: 0.8em; opacity: 0.7;">Version: v2.1.3 - Debug Enhanced</p>
             </div>
             
             <div class="content">
