@@ -207,6 +207,31 @@ class ImprovedScroller:
             Communicator.show_message("No results found for your search query on Google Maps")
             return
 
+        # Debug the initial page structure
+        try:
+            initial_html = scrollAbleElement.get_attribute('outerHTML')
+            print(f"DEBUG: Initial HTML length: {len(initial_html)}")
+            Communicator.show_message(f"DEBUG: Initial HTML length: {len(initial_html)}")
+            
+            # Try to find any result links in the initial page
+            initial_soup = BeautifulSoup(initial_html, 'html.parser')
+            initial_links = initial_soup.find_all('a')
+            print(f"DEBUG: Initial page has {len(initial_links)} total links")
+            Communicator.show_message(f"DEBUG: Initial page has {len(initial_links)} total links")
+            
+            # Check for different link patterns
+            maps_links = [link for link in initial_links if link.get('href') and ('maps' in link.get('href', '') or 'place' in link.get('href', ''))]
+            print(f"DEBUG: Initial page has {len(maps_links)} maps-related links")
+            Communicator.show_message(f"DEBUG: Initial page has {len(maps_links)} maps-related links")
+            
+            if maps_links:
+                print(f"DEBUG: First few map links: {[link.get('href') for link in maps_links[:3]]}")
+                Communicator.show_message(f"DEBUG: First few map links found")
+                
+        except Exception as e:
+            print(f"DEBUG: Error analyzing initial page: {str(e)}")
+            Communicator.show_message(f"DEBUG: Error analyzing initial page: {str(e)}")
+
         Communicator.show_message("Starting scrolling to load more results...")
         
         last_height = 0
@@ -249,14 +274,39 @@ class ImprovedScroller:
                 
                 # Collect results during scrolling
                 try:
-                    allResultsListSoup = BeautifulSoup(
-                        scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
-                    )
-                    allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
-                    current_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
+                    # Get the HTML content and debug it
+                    html_content = scrollAbleElement.get_attribute('outerHTML')
+                    print(f"DEBUG: HTML content length: {len(html_content)}")
+                    Communicator.show_message(f"DEBUG: HTML content length: {len(html_content)}")
                     
-                    print(f"DEBUG: Found {len(current_links)} links in this scroll iteration")
-                    Communicator.show_message(f"DEBUG: Found {len(current_links)} links in this scroll iteration")
+                    allResultsListSoup = BeautifulSoup(html_content, 'html.parser')
+                    
+                    # Try multiple selectors for result links
+                    selectors_to_try = [
+                        ('a.hfpxzc', 'original selector'),
+                        ('a[data-value]', 'data-value selector'),
+                        ('a[href*="/maps/place/"]', 'maps place href'),
+                        ('a[href*="maps.google.com"]', 'maps google href'),
+                        ('a', 'all links')
+                    ]
+                    
+                    current_links = []
+                    for selector, description in selectors_to_try:
+                        elements = allResultsListSoup.select(selector)
+                        print(f"DEBUG: {description}: {len(elements)} elements found")
+                        Communicator.show_message(f"DEBUG: {description}: {len(elements)} elements found")
+                        
+                        if elements:
+                            links = [elem.get('href') for elem in elements if elem.get('href')]
+                            current_links.extend(links)
+                            print(f"DEBUG: {description} links: {links[:3]}...")  # Show first 3 links
+                            Communicator.show_message(f"DEBUG: {description} links found: {len(links)}")
+                    
+                    # Remove duplicates
+                    current_links = list(set(current_links))
+                    
+                    print(f"DEBUG: Total unique links found: {len(current_links)}")
+                    Communicator.show_message(f"DEBUG: Total unique links found: {len(current_links)}")
                     
                     # Ensure __allResultsLinks exists
                     if not hasattr(self, '__allResultsLinks'):
