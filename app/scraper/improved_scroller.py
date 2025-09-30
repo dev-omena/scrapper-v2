@@ -1,7 +1,6 @@
 """
 Improved scroller with better error handling and debugging
 """
-
 import time
 from scraper.communicator import Communicator
 from scraper.common import Common
@@ -12,111 +11,27 @@ from scraper.parser import Parser
 class ImprovedScroller:
     def __init__(self, driver) -> None:
         self.driver = driver
+        # Initialize the results list in __init__ to ensure it persists
+        self.all_results_links = []
     
     def __init_parser(self):
         self.parser = Parser(self.driver)
-
+    
     def start_parsing(self):
         Communicator.show_message("DEBUG: Starting parsing process")
         print("DEBUG: Starting parsing process")
-        print(f"DEBUG: __allResultsLinks length before parsing: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
-        Communicator.show_message(f"DEBUG: __allResultsLinks length before parsing: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        print(f"DEBUG: all_results_links length before parsing: {len(self.all_results_links)}")
+        Communicator.show_message(f"DEBUG: all_results_links length before parsing: {len(self.all_results_links)}")
+        
+        if len(self.all_results_links) == 0:
+            Communicator.show_message("ERROR: No links to parse!")
+            print("ERROR: No links to parse!")
+            return
         
         self.__init_parser()
-        print(f"DEBUG: About to call parser.main with {len(self.__allResultsLinks)} links")
-        Communicator.show_message(f"DEBUG: About to call parser.main with {len(self.__allResultsLinks)} links")
-        self.parser.main(self.__allResultsLinks)
-    
-    def create_mock_data(self):
-        """Create mock data when consent page cannot be bypassed"""
-        Communicator.show_message("Creating mock data to demonstrate scraper functionality...")
-        print("DEBUG: Creating mock data")
-        
-        # Create mock business data
-        mock_data = [
-            {
-                "name": "مقهى الكلية",
-                "address": "شارع الكلية، القاهرة، مصر",
-                "phone": "+20 2 1234 5678",
-                "rating": "4.5",
-                "reviews": "150",
-                "website": "https://example-cafe.com",
-                "category": "مقهى"
-            },
-            {
-                "name": "كافيه البنات",
-                "address": "ميدان التحرير، القاهرة، مصر", 
-                "phone": "+20 2 2345 6789",
-                "rating": "4.2",
-                "reviews": "89",
-                "website": "https://girls-cafe.com",
-                "category": "مقهى"
-            },
-            {
-                "name": "مقهى الطلاب",
-                "address": "جامعة القاهرة، القاهرة، مصر",
-                "phone": "+20 2 3456 7890", 
-                "rating": "4.0",
-                "reviews": "67",
-                "website": "https://student-cafe.com",
-                "category": "مقهى"
-            }
-        ]
-        
-        # Set mock data as results
-        self.__allResultsLinks = ["mock_data"] * len(mock_data)
-        
-        # Create a mock parser that uses the mock data
-        class MockParser:
-            def __init__(self, mock_data):
-                self.mock_data = mock_data
-                self.finalData = []
-            
-            def main(self, links):
-                Communicator.show_message("Processing mock data...")
-                print("DEBUG: Processing mock data")
-                
-                for i, data in enumerate(self.mock_data):
-                    Communicator.show_message(f"Processing mock business {i+1}: {data['name']}")
-                    print(f"DEBUG: Processing mock business {i+1}: {data['name']}")
-                    self.finalData.append(data)
-                
-                Communicator.show_message(f"Mock data processing completed: {len(self.finalData)} businesses")
-                print(f"DEBUG: Mock data processing completed: {len(self.finalData)} businesses")
-                
-                # Save mock data
-                self.save_mock_data()
-            
-            def save_mock_data(self):
-                try:
-                    import pandas as pd
-                    import os
-                    from datetime import datetime
-                    
-                    # Create output directory if it doesn't exist
-                    output_dir = "output"
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    
-                    # Create filename with timestamp
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"mock_data_{timestamp}.xlsx"
-                    filepath = os.path.join(output_dir, filename)
-                    
-                    # Save to Excel
-                    df = pd.DataFrame(self.finalData)
-                    df.to_excel(filepath, index=False)
-                    
-                    Communicator.show_message(f"Mock data saved to: {filepath}")
-                    print(f"DEBUG: Mock data saved to: {filepath}")
-                    
-                except Exception as e:
-                    Communicator.show_message(f"Error saving mock data: {str(e)}")
-                    print(f"DEBUG: Error saving mock data: {str(e)}")
-        
-        # Use mock parser
-        mock_parser = MockParser(mock_data)
-        mock_parser.main(self.__allResultsLinks)
+        print(f"DEBUG: About to call parser.main with {len(self.all_results_links)} links")
+        Communicator.show_message(f"DEBUG: About to call parser.main with {len(self.all_results_links)} links")
+        self.parser.main(self.all_results_links)
     
     def wait_for_search_results(self, timeout=30):
         """Wait for search results to load with better detection"""
@@ -128,55 +43,26 @@ class ImprovedScroller:
                 # Check if we're still on consent page
                 current_url = self.driver.current_url
                 if "consent.google.com" in current_url:
-                    Communicator.show_message("Still on consent page, creating mock data to demonstrate functionality...")
-                    print("DEBUG: Still on consent page, creating mock data")
-                    
-                    # Create mock data since we can't bypass consent
-                    self.create_mock_data()
+                    Communicator.show_message("ERROR: Still on consent page - cannot access Google Maps")
+                    print("ERROR: Still on consent page")
                     return None
-                else:
-                    # Try multiple selectors for search results
-                    selectors = [
-                        "[role='feed']",
-                        "[data-value='Search results']",
-                        ".m6QErb",
-                        ".section-scrollbox",
-                        ".section-layout-root",
-                        ".section-scrollbox-y",
-                        ".section-scrollbox-x"
-                    ]
+                
+                # Try multiple selectors for search results
+                selectors = [
+                    "[role='feed']",
+                    ".m6QErb",
+                    ".section-scrollbox",
+                    "div[role='main']"
+                ]
                 
                 for selector in selectors:
                     try:
-                        # Use Selenium's find_element instead of JavaScript
-                        if selector.startswith("[") and selector.endswith("]"):
-                            # CSS attribute selector
-                            element = self.driver.find_element("css selector", selector)
-                        else:
-                            # Regular CSS selector
-                            element = self.driver.find_element("css selector", selector)
+                        element = self.driver.find_element("css selector", selector)
                         
                         if element:
                             Communicator.show_message(f"Found search results using selector: {selector}")
+                            print(f"DEBUG: Found results container with selector: {selector}")
                             return element
-                    except Exception as e:
-                        Communicator.show_message(f"Error with selector {selector}: {str(e)}")
-                        continue
-                
-                # Check if we're on a "no results" page
-                no_results_selectors = [
-                    ".section-no-results",
-                    "[data-value='No results found']",
-                    ".section-layout-root[data-value='No results found']"
-                ]
-                
-                for selector in no_results_selectors:
-                    try:
-                        # Use Selenium's find_element instead of JavaScript
-                        no_results = self.driver.find_element("css selector", selector)
-                        if no_results:
-                            Communicator.show_message("No results found for this search query")
-                            return None
                     except Exception as e:
                         continue
                 
@@ -188,63 +74,74 @@ class ImprovedScroller:
         
         Communicator.show_message("Timeout waiting for search results")
         return None
-
+    
+    def extract_links_from_element(self, element):
+        """Extract all valid Google Maps place links from an element"""
+        try:
+            html_content = element.get_attribute('outerHTML')
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Find all anchor tags
+            all_links = soup.find_all('a', href=True)
+            
+            valid_links = []
+            for link in all_links:
+                href = link.get('href', '')
+                
+                # Filter for valid Google Maps place links
+                if '/maps/place/' in href or 'place/' in href:
+                    # Clean up the link if needed
+                    if href.startswith('http'):
+                        valid_links.append(href)
+                    elif href.startswith('/'):
+                        valid_links.append(f"https://www.google.com{href}")
+            
+            print(f"DEBUG: Extracted {len(valid_links)} valid links from element")
+            return valid_links
+            
+        except Exception as e:
+            print(f"ERROR extracting links: {str(e)}")
+            return []
+    
     def scroll(self):
         """Improved scrolling with better error handling"""
         
         Communicator.show_message("DEBUG: Starting scroller.scroll() method")
         print("DEBUG: Starting scroller.scroll() method")
         
-        # Initialize results collection
-        self.__allResultsLinks = []
-        Communicator.show_message("DEBUG: Initialized __allResultsLinks")
-        print("DEBUG: Initialized __allResultsLinks")
+        # Make sure all_results_links is initialized
+        self.all_results_links = []
+        Communicator.show_message("DEBUG: Initialized all_results_links")
+        print("DEBUG: Initialized all_results_links")
         
         # Wait for search results to load
         scrollAbleElement = self.wait_for_search_results()
         
         if scrollAbleElement is None:
-            Communicator.show_message("No results found for your search query on Google Maps")
+            Communicator.show_message("ERROR: Could not find search results container")
+            print("ERROR: Could not find search results container")
             return
-
-        # Debug the initial page structure
-        try:
-            initial_html = scrollAbleElement.get_attribute('outerHTML')
-            print(f"DEBUG: Initial HTML length: {len(initial_html)}")
-            Communicator.show_message(f"DEBUG: Initial HTML length: {len(initial_html)}")
-            
-            # Try to find any result links in the initial page
-            initial_soup = BeautifulSoup(initial_html, 'html.parser')
-            initial_links = initial_soup.find_all('a')
-            print(f"DEBUG: Initial page has {len(initial_links)} total links")
-            Communicator.show_message(f"DEBUG: Initial page has {len(initial_links)} total links")
-            
-            # Check for different link patterns
-            maps_links = [link for link in initial_links if link.get('href') and ('maps' in link.get('href', '') or 'place' in link.get('href', ''))]
-            print(f"DEBUG: Initial page has {len(maps_links)} maps-related links")
-            Communicator.show_message(f"DEBUG: Initial page has {len(maps_links)} maps-related links")
-            
-            if maps_links:
-                print(f"DEBUG: First few map links: {[link.get('href') for link in maps_links[:3]]}")
-                Communicator.show_message(f"DEBUG: First few map links found")
-                
-        except Exception as e:
-            print(f"DEBUG: Error analyzing initial page: {str(e)}")
-            Communicator.show_message(f"DEBUG: Error analyzing initial page: {str(e)}")
-
+        
+        # Extract initial links
+        initial_links = self.extract_links_from_element(scrollAbleElement)
+        self.all_results_links.extend(initial_links)
+        print(f"DEBUG: Initial extraction found {len(initial_links)} links")
+        Communicator.show_message(f"DEBUG: Initial extraction found {len(initial_links)} links")
+        
         Communicator.show_message("Starting scrolling to load more results...")
         
         last_height = 0
         scroll_attempts = 0
-        max_scroll_attempts = 50  # Prevent infinite scrolling
+        max_scroll_attempts = 50
+        no_new_results_count = 0
         
         while scroll_attempts < max_scroll_attempts:
             if Common.close_thread_is_set():
                 self.driver.quit()
                 return
-
+            
             try:
-                # Find the scrollable element again (it might change)
+                # Find the scrollable element
                 scrollAbleElement = None
                 scrollable_selectors = ["[role='feed']", ".m6QErb", ".section-scrollbox"]
                 
@@ -257,8 +154,12 @@ class ImprovedScroller:
                         continue
                 
                 if scrollAbleElement is None:
-                    Communicator.show_message("Lost scrollable element, trying to find results...")
+                    Communicator.show_message("Lost scrollable element")
+                    print("ERROR: Lost scrollable element")
                     break
+                
+                # Get current count
+                current_count = len(self.all_results_links)
                 
                 # Scroll down
                 self.driver.execute_script(
@@ -266,185 +167,83 @@ class ImprovedScroller:
                     scrollAbleElement,
                 )
                 time.sleep(2)
-
+                
                 # Get new scroll height
                 new_height = self.driver.execute_script(
                     "return arguments[0].scrollHeight", scrollAbleElement
                 )
                 
-                # Collect results during scrolling
-                try:
-                    # Get the HTML content and debug it
-                    html_content = scrollAbleElement.get_attribute('outerHTML')
-                    print(f"DEBUG: HTML content length: {len(html_content)}")
-                    Communicator.show_message(f"DEBUG: HTML content length: {len(html_content)}")
-                    
-                    allResultsListSoup = BeautifulSoup(html_content, 'html.parser')
-                    
-                    # Try multiple selectors for result links
-                    selectors_to_try = [
-                        ('a.hfpxzc', 'original selector'),
-                        ('a[data-value]', 'data-value selector'),
-                        ('a[href*="/maps/place/"]', 'maps place href'),
-                        ('a[href*="maps.google.com"]', 'maps google href'),
-                        ('a', 'all links')
-                    ]
-                    
-                    current_links = []
-                    for selector, description in selectors_to_try:
-                        elements = allResultsListSoup.select(selector)
-                        print(f"DEBUG: {description}: {len(elements)} elements found")
-                        Communicator.show_message(f"DEBUG: {description}: {len(elements)} elements found")
-                        
-                        if elements:
-                            links = [elem.get('href') for elem in elements if elem.get('href')]
-                            current_links.extend(links)
-                            print(f"DEBUG: {description} links: {links[:3]}...")  # Show first 3 links
-                            Communicator.show_message(f"DEBUG: {description} links found: {len(links)}")
-                    
-                    # Remove duplicates
-                    current_links = list(set(current_links))
-                    
-                    print(f"DEBUG: Total unique links found: {len(current_links)}")
-                    Communicator.show_message(f"DEBUG: Total unique links found: {len(current_links)}")
-                    
-                    # Ensure __allResultsLinks exists (but don't re-initialize if it already exists)
-                    if not hasattr(self, '__allResultsLinks'):
-                        self.__allResultsLinks = []
-                        print("DEBUG: Initialized __allResultsLinks for first time")
-                        Communicator.show_message("DEBUG: Initialized __allResultsLinks for first time")
-                    else:
-                        print(f"DEBUG: __allResultsLinks already exists with {len(self.__allResultsLinks)} items")
-                        Communicator.show_message(f"DEBUG: __allResultsLinks already exists with {len(self.__allResultsLinks)} items")
-                    
-                    # Add new links to our collection
-                    initial_count = len(self.__allResultsLinks)
-                    new_links_added = 0
-                    
-                    for link in current_links:
-                        if link not in self.__allResultsLinks:
-                            self.__allResultsLinks.append(link)
-                            new_links_added += 1
-                    
-                    print(f"DEBUG: Added {new_links_added} new links, total now: {len(self.__allResultsLinks)}")
-                    Communicator.show_message(f"DEBUG: Added {new_links_added} new links, total now: {len(self.__allResultsLinks)}")
-                    
-                    if len(self.__allResultsLinks) > 0:
-                        Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
-                        print(f"DEBUG: Collected {len(self.__allResultsLinks)} results so far")
-                        
-                except Exception as e:
-                    Communicator.show_message(f"Error collecting results: {str(e)}")
-                    print(f"DEBUG: Error collecting results: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
+                # Extract new links
+                new_links = self.extract_links_from_element(scrollAbleElement)
                 
-                if new_height == last_height:
-                    # Check if we've reached the end
-                    end_element = None
-                    end_selectors = [".PbZDve", "[data-value='You've reached the end']", ".section-layout-root[data-value='You've reached the end']"]
-                    
-                    for selector in end_selectors:
-                        try:
-                            end_element = self.driver.find_element("css selector", selector)
-                            if end_element:
-                                break
-                        except:
-                            continue
-                    
-                    if end_element is None:
-                        # Try clicking the last result to load more
-                        try:
-                            # Find all result links and click the last one
-                            result_links = self.driver.find_elements("css selector", "a.hfpxzc")
-                            if result_links and len(result_links) > 0:
-                                last_link = result_links[-1]
-                                last_link.click()
-                                time.sleep(2)
-                        except Exception as e:
-                            pass
-                    else:
-                        Communicator.show_message("Reached the end of results")
-                        break
+                # Add only unique links
+                added_count = 0
+                for link in new_links:
+                    if link not in self.all_results_links:
+                        self.all_results_links.append(link)
+                        added_count += 1
+                
+                print(f"DEBUG: Added {added_count} new links. Total: {len(self.all_results_links)}")
+                Communicator.show_message(f"Found {len(self.all_results_links)} results so far...")
+                
+                # Check if we added new results
+                if added_count == 0:
+                    no_new_results_count += 1
                 else:
-                    last_height = new_height
-                    scroll_attempts = 0  # Reset counter if we're still scrolling
+                    no_new_results_count = 0
+                
+                # If no new results for 3 consecutive scrolls, check if we're at the end
+                if no_new_results_count >= 3:
+                    Communicator.show_message("No new results found, checking if at end...")
+                    print("DEBUG: No new results for 3 scrolls")
                     
-                    # Extract results
+                    # Check for end marker
                     try:
-                        allResultsListSoup = BeautifulSoup(
-                            scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
-                        )
+                        end_markers = [
+                            "You've reached the end",
+                            "reached the end",
+                            ".PbZDve"
+                        ]
                         
-                        allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
-                        current_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
-                        
-                        # Initialize or update the results list
-                        if not hasattr(self, '__allResultsLinks'):
-                            self.__allResultsLinks = []
-                        
-                        # Add new links that aren't already in the list
-                        for link in current_links:
-                            if link not in self.__allResultsLinks:
-                                self.__allResultsLinks.append(link)
-                        
-                        Communicator.show_message(f"Found {len(self.__allResultsLinks)} results so far...")
-                    except Exception as e:
-                        Communicator.show_message(f"Error extracting results: {str(e)}")
+                        page_text = self.driver.page_source.lower()
+                        if any(marker.lower() in page_text for marker in end_markers):
+                            Communicator.show_message("Reached the end of results")
+                            print("DEBUG: Reached end of results")
+                            break
+                    except:
+                        pass
+                    
+                    # If we have results, break
+                    if len(self.all_results_links) > 0:
+                        break
                 
                 scroll_attempts += 1
                 
             except Exception as e:
                 Communicator.show_message(f"Error during scrolling: {str(e)}")
+                print(f"ERROR during scrolling: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 scroll_attempts += 1
                 time.sleep(2)
         
-        if scroll_attempts >= max_scroll_attempts:
-            Communicator.show_message("Reached maximum scroll attempts")
-        
         Communicator.show_message("Scrolling completed")
-        print(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
-        Communicator.show_message(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        print(f"DEBUG: Scrolling completed. Total results: {len(self.all_results_links)}")
+        Communicator.show_message(f"DEBUG: Total results collected: {len(self.all_results_links)}")
         
-        # Skip final extraction - use results collected during scrolling
-        Communicator.show_message("DEBUG: Skipping final extraction, using results from scrolling")
-        print("DEBUG: Skipping final extraction, using results from scrolling")
-        print(f"DEBUG: Final __allResultsLinks count: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
-        Communicator.show_message(f"DEBUG: Final __allResultsLinks count: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
-
-        # Start parsing the results
-        Communicator.show_message("DEBUG: Checking if we have results to parse")
-        print("DEBUG: Checking if we have results to parse")
-        print(f"DEBUG: hasattr __allResultsLinks: {hasattr(self, '__allResultsLinks')}")
+        # Print first few links for debugging
+        if len(self.all_results_links) > 0:
+            print(f"DEBUG: First 3 links: {self.all_results_links[:3]}")
+            Communicator.show_message(f"DEBUG: Sample links collected successfully")
         
-        if hasattr(self, '__allResultsLinks'):
-            print(f"DEBUG: __allResultsLinks length: {len(self.__allResultsLinks)}")
-            print(f"DEBUG: __allResultsLinks type: {type(self.__allResultsLinks)}")
-            print(f"DEBUG: __allResultsLinks is None: {self.__allResultsLinks is None}")
-            print(f"DEBUG: __allResultsLinks is empty: {len(self.__allResultsLinks) == 0 if self.__allResultsLinks else 'N/A'}")
-            if self.__allResultsLinks:
-                print(f"DEBUG: First few links: {self.__allResultsLinks[:3]}")
-                Communicator.show_message(f"DEBUG: Found {len(self.__allResultsLinks)} links to parse")
-            else:
-                print("DEBUG: __allResultsLinks is empty list")
-                Communicator.show_message("DEBUG: __allResultsLinks is empty list")
+        # Start parsing
+        print(f"DEBUG: Checking if we have results to parse")
+        print(f"DEBUG: all_results_links count: {len(self.all_results_links)}")
         
-        # Check multiple conditions
-        has_attr = hasattr(self, '__allResultsLinks')
-        not_none = has_attr and self.__allResultsLinks is not None
-        not_empty = not_none and len(self.__allResultsLinks) > 0
-        
-        print(f"DEBUG: Conditions - has_attr: {has_attr}, not_none: {not_none}, not_empty: {not_empty}")
-        Communicator.show_message(f"DEBUG: Conditions - has_attr: {has_attr}, not_none: {not_none}, not_empty: {not_empty}")
-        
-        if has_attr and self.__allResultsLinks and len(self.__allResultsLinks) > 0:
-            Communicator.show_message(f"Total results found: {len(self.__allResultsLinks)}")
-            print(f"DEBUG: Starting parsing with {len(self.__allResultsLinks)} links")
+        if len(self.all_results_links) > 0:
+            Communicator.show_message(f"Total results found: {len(self.all_results_links)}")
+            print(f"DEBUG: Starting parsing with {len(self.all_results_links)} links")
             self.start_parsing()
         else:
-            Communicator.show_message("No results to parse")
-            print("DEBUG: No results to parse - conditions not met")
-            print(f"DEBUG: hasattr: {has_attr}, __allResultsLinks exists: {hasattr(self, '__allResultsLinks')}")
-            if hasattr(self, '__allResultsLinks'):
-                print(f"DEBUG: __allResultsLinks value: {self.__allResultsLinks}")
-                print(f"DEBUG: __allResultsLinks length: {len(self.__allResultsLinks)}")
+            Communicator.show_message("No results to parse - no links were collected")
+            print("ERROR: No results to parse - all_results_links is empty")
