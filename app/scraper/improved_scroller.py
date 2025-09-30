@@ -335,37 +335,11 @@ class ImprovedScroller:
         print(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
         Communicator.show_message(f"DEBUG: Scrolling completed. Total results collected: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
         
-        # Final extraction of all results
-        try:
-            # Try to get all results one more time
-            scrollAbleElement = None
-            scrollable_selectors = ["[role='feed']", ".m6QErb", ".section-scrollbox"]
-            
-            for selector in scrollable_selectors:
-                try:
-                    scrollAbleElement = self.driver.find_element("css selector", selector)
-                    if scrollAbleElement:
-                        break
-                except:
-                    continue
-            
-            if scrollAbleElement:
-                allResultsListSoup = BeautifulSoup(
-                    scrollAbleElement.get_attribute('outerHTML'), 'html.parser'
-                )
-                
-                allResultsAnchorTags = allResultsListSoup.find_all('a', class_='hfpxzc')
-                final_links = [anchorTag.get('href') for anchorTag in allResultsAnchorTags if anchorTag.get('href')]
-                
-                # Add all final links (ensure no duplicates)
-                for link in final_links:
-                    if link not in self.__allResultsLinks:
-                        self.__allResultsLinks.append(link)
-                
-                Communicator.show_message(f"Final extraction added {len(final_links)} links, total: {len(self.__allResultsLinks)}")
-                print(f"DEBUG: Final extraction added {len(final_links)} links, total: {len(self.__allResultsLinks)}")
-        except Exception as e:
-            Communicator.show_message(f"Error in final extraction: {str(e)}")
+        # Skip final extraction - use results collected during scrolling
+        Communicator.show_message("DEBUG: Skipping final extraction, using results from scrolling")
+        print("DEBUG: Skipping final extraction, using results from scrolling")
+        print(f"DEBUG: Final __allResultsLinks count: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
+        Communicator.show_message(f"DEBUG: Final __allResultsLinks count: {len(self.__allResultsLinks) if hasattr(self, '__allResultsLinks') and self.__allResultsLinks else 0}")
 
         # Start parsing the results
         Communicator.show_message("DEBUG: Checking if we have results to parse")
