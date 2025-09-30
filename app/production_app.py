@@ -573,20 +573,35 @@ def list_files():
     """List all available files for download"""
     output_files = []
     if os.path.exists('output'):
-        output_files = [f for f in os.listdir('output') if f.endswith(('.xlsx', '.csv', '.json'))]
+        all_files = os.listdir('output')
+        output_files = [f for f in all_files if f.endswith(('.xlsx', '.csv', '.json'))]
+        print(f"DEBUG: Found {len(output_files)} files: {output_files}")
+    else:
+        print("DEBUG: Output directory does not exist")
     
-    return jsonify({"files": output_files})
+    return jsonify({"files": output_files, "all_files": all_files if os.path.exists('output') else []})
 
 @app.route('/download/<filename>')
 def download_file(filename):
     """Download scraped data file"""
     try:
         file_path = os.path.join('output', filename)
+        print(f"DEBUG: Download requested for: {filename}")
+        print(f"DEBUG: File path: {file_path}")
+        print(f"DEBUG: File exists: {os.path.exists(file_path)}")
+        
         if os.path.exists(file_path):
+            print(f"DEBUG: Sending file: {file_path}")
             return send_file(file_path, as_attachment=True, download_name=filename)
         else:
-            return jsonify({"error": "File not found"}), 404
+            print(f"DEBUG: File not found: {file_path}")
+            # List all files in output directory for debugging
+            if os.path.exists('output'):
+                all_files = os.listdir('output')
+                print(f"DEBUG: Available files in output: {all_files}")
+            return jsonify({"error": "File not found", "available_files": all_files if os.path.exists('output') else []}), 404
     except Exception as e:
+        print(f"DEBUG: Download error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/health')
