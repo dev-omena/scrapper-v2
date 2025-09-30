@@ -27,6 +27,10 @@ class ImprovedBackend(Base):
 
     def init_driver(self):
         options = uc.ChromeOptions()
+        
+        # Add Chrome binary path for DigitalOcean
+        options.binary_location = "/opt/google/chrome/chrome"
+        
         if self.headlessMode == 1:
             options.headless = True
 
