@@ -642,19 +642,41 @@ def scrape():
                 # through the existing DataSaver in the scraper
                 production_comm.show_message("Data saving completed automatically")
                 
-                # Check what files were actually created
-                if os.path.exists('output'):
-                    created_files = [f for f in os.listdir('output') if f.endswith(('.xlsx', '.csv', '.json'))]
-                    if created_files:
-                        # Get the most recent file
-                        latest_file = max(created_files, key=lambda x: os.path.getctime(os.path.join('output', x)))
+                # Check what files were actually created in multiple possible locations
+                possible_output_dirs = ['output', '../output', '/root/scrapper-v2/output', '/root/scrapper-v2/app/output']
+                created_files = []
+                
+                for output_dir in possible_output_dirs:
+                    if os.path.exists(output_dir):
+                        try:
+                            files = [f for f in os.listdir(output_dir) if f.endswith(('.xlsx', '.csv', '.json'))]
+                            created_files.extend(files)
+                            production_comm.show_message(f"Found {len(files)} files in {output_dir}")
+                        except Exception as e:
+                            production_comm.show_message(f"Error reading {output_dir}: {e}")
+                
+                if created_files:
+                    # Remove duplicates
+                    created_files = list(dict.fromkeys(created_files))
+                    # Get the most recent file by finding it in any directory
+                    latest_file = None
+                    latest_time = 0
+                    for file in created_files:
+                        for output_dir in possible_output_dirs:
+                            file_path = os.path.join(output_dir, file)
+                            if os.path.exists(file_path):
+                                file_time = os.path.getctime(file_path)
+                                if file_time > latest_time:
+                                    latest_time = file_time
+                                    latest_file = file
+                    
+                    if latest_file:
                         production_comm.output_file = latest_file
                         production_comm.show_message(f"Output file created: {latest_file}")
                         production_comm.show_message(f"All available files: {', '.join(created_files)}")
-                    else:
-                        production_comm.show_message("No output files found in output directory")
                 else:
-                    production_comm.show_message("Output directory does not exist")
+                    production_comm.show_message("No output files found in any output directory")
+                    production_comm.show_message(f"Checked directories: {', '.join(possible_output_dirs)}")
                 
                 production_comm.status = "completed"
                 production_comm.show_message(f"Job {job_id} completed successfully!")
@@ -681,17 +703,29 @@ def scrape():
 @app.route('/status')
 def status():
     """Get current scraping status"""
-    # Check for output files in the output directory
+    # Check for output files in multiple possible output directories
     output_files = []
-    if os.path.exists('output'):
-        output_files = [f for f in os.listdir('output') if f.endswith(('.xlsx', '.csv', '.json'))]
+    possible_output_dirs = ['output', '../output', '/root/scrapper-v2/output', '/root/scrapper-v2/app/output']
+    
+    for output_dir in possible_output_dirs:
+        if os.path.exists(output_dir):
+            try:
+                files = [f for f in os.listdir(output_dir) if f.endswith(('.xlsx', '.csv', '.json'))]
+                output_files.extend(files)
+                print(f"DEBUG: Found {len(files)} files in {output_dir}: {files}")
+            except Exception as e:
+                print(f"DEBUG: Error reading {output_dir}: {e}")
+    
+    # Remove duplicates while preserving order
+    output_files = list(dict.fromkeys(output_files))
     
     return jsonify({
         "status": production_comm.status,
         "messages": production_comm.messages[-50:],  # Last 50 messages to show more debug info
         "job_id": production_comm.job_id,
         "output_file": production_comm.output_file,
-        "available_files": output_files
+        "available_files": output_files,
+        "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
     })
 
 @app.route('/files')
@@ -711,21 +745,55 @@ def list_files():
 def download_file(filename):
     """Download scraped data file"""
     try:
-        file_path = os.path.join('output', filename)
-        print(f"DEBUG: Download requested for: {filename}")
-        print(f"DEBUG: File path: {file_path}")
-        print(f"DEBUG: File exists: {os.path.exists(file_path)}")
+        # Try multiple possible output directories
+        possible_paths = [
+            os.path.join('output', filename),  # Current directory
+            os.path.join('..', 'output', filename),  # Parent directory
+            os.path.join('/root/scrapper-v2/output', filename),  # Absolute path
+            os.path.join('/root/scrapper-v2/app/output', filename),  # App subdirectory
+        ]
         
-        if os.path.exists(file_path):
+        print(f"DEBUG: Download requested for: {filename}")
+        
+        file_path = None
+        for path in possible_paths:
+            print(f"DEBUG: Checking path: {path}")
+            if os.path.exists(path):
+                file_path = path
+                print(f"DEBUG: Found file at: {file_path}")
+                break
+        
+        if file_path and os.path.exists(file_path):
             print(f"DEBUG: Sending file: {file_path}")
             return send_file(file_path, as_attachment=True, download_name=filename)
         else:
-            print(f"DEBUG: File not found: {file_path}")
-            # List all files in output directory for debugging
-            if os.path.exists('output'):
-                all_files = os.listdir('output')
-                print(f"DEBUG: Available files in output: {all_files}")
-            return jsonify({"error": "File not found", "available_files": all_files if os.path.exists('output') else []}), 404
+            print(f"DEBUG: File not found in any expected location")
+            # Check what directories and files actually exist
+            debug_info = {
+                "requested_filename": filename,
+                "current_working_dir": os.getcwd(),
+                "checked_paths": possible_paths,
+            }
+            
+            # Check if output directories exist
+            output_dirs = ['output', '../output', '/root/scrapper-v2/output', '/root/scrapper-v2/app/output']
+            existing_dirs = []
+            for dir_path in output_dirs:
+                if os.path.exists(dir_path):
+                    existing_dirs.append(dir_path)
+                    try:
+                        files = os.listdir(dir_path)
+                        debug_info[f"files_in_{dir_path}"] = files
+                    except Exception as e:
+                        debug_info[f"error_reading_{dir_path}"] = str(e)
+            
+            debug_info["existing_output_dirs"] = existing_dirs
+            print(f"DEBUG: Debug info: {debug_info}")
+            
+            return jsonify({
+                "error": "File not found", 
+                "debug_info": debug_info
+            }), 404
     except Exception as e:
         print(f"DEBUG: Download error: {str(e)}")
         return jsonify({"error": str(e)}), 500
