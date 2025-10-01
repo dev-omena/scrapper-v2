@@ -739,21 +739,41 @@ def list_files():
     else:
         print("DEBUG: Output directory does not exist")
     
+    # Also check for the most recent file if no specific files found
+    if not output_files and os.path.exists('output'):
+        all_files = os.listdir('output')
+        if all_files:
+            # Get the most recently modified file
+            files_with_time = [(f, os.path.getmtime(os.path.join('output', f))) for f in all_files if os.path.isfile(os.path.join('output', f))]
+            if files_with_time:
+                most_recent = max(files_with_time, key=lambda x: x[1])
+                print(f"DEBUG: Most recent file: {most_recent[0]}")
+                output_files = [most_recent[0]]
+    
     return jsonify({"files": output_files, "all_files": all_files if os.path.exists('output') else []})
 
 @app.route('/download/<filename>')
 def download_file(filename):
     """Download scraped data file"""
     try:
+        import urllib.parse
+        
+        # URL decode the filename to handle Arabic characters
+        decoded_filename = urllib.parse.unquote(filename)
+        print(f"DEBUG: Download requested for: {filename}")
+        print(f"DEBUG: Decoded filename: {decoded_filename}")
+        
         # Try multiple possible output directories
         possible_paths = [
-            os.path.join('output', filename),  # Current directory
-            os.path.join('..', 'output', filename),  # Parent directory
-            os.path.join('/root/scrapper-v2/output', filename),  # Absolute path
-            os.path.join('/root/scrapper-v2/app/output', filename),  # App subdirectory
+            os.path.join('output', decoded_filename),  # Current directory
+            os.path.join('output', filename),  # Original encoded filename
+            os.path.join('..', 'output', decoded_filename),  # Parent directory
+            os.path.join('..', 'output', filename),  # Parent directory with encoded
+            os.path.join('/root/scrapper-v2/output', decoded_filename),  # Absolute path
+            os.path.join('/root/scrapper-v2/output', filename),  # Absolute path encoded
+            os.path.join('/root/scrapper-v2/app/output', decoded_filename),  # App subdirectory
+            os.path.join('/root/scrapper-v2/app/output', filename),  # App subdirectory encoded
         ]
-        
-        print(f"DEBUG: Download requested for: {filename}")
         
         file_path = None
         for path in possible_paths:
@@ -768,9 +788,23 @@ def download_file(filename):
             return send_file(file_path, as_attachment=True, download_name=filename)
         else:
             print(f"DEBUG: File not found in any expected location")
+            
+            # If specific file not found, try to find any recent file
+            if os.path.exists('output'):
+                all_files = os.listdir('output')
+                if all_files:
+                    # Get the most recently modified file
+                    files_with_time = [(f, os.path.getmtime(os.path.join('output', f))) for f in all_files if os.path.isfile(os.path.join('output', f))]
+                    if files_with_time:
+                        most_recent = max(files_with_time, key=lambda x: x[1])
+                        most_recent_path = os.path.join('output', most_recent[0])
+                        print(f"DEBUG: Serving most recent file instead: {most_recent_path}")
+                        return send_file(most_recent_path, as_attachment=True, download_name=most_recent[0])
+            
             # Check what directories and files actually exist
             debug_info = {
                 "requested_filename": filename,
+                "decoded_filename": decoded_filename,
                 "current_working_dir": os.getcwd(),
                 "checked_paths": possible_paths,
             }
