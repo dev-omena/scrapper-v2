@@ -766,9 +766,9 @@ def scrape():
 @app.route('/status')
 def status():
     """Get current scraping status"""
-    # Check for output files in multiple possible output directories
+    # Check for output files in multiple possible output directories (prioritize main output dir)
     output_files = []
-    possible_output_dirs = ['output', '../output', '/root/scrapper-v2/output', '/root/scrapper-v2/app/output']
+    possible_output_dirs = ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']
     
     for output_dir in possible_output_dirs:
         if os.path.exists(output_dir):
@@ -795,12 +795,24 @@ def status():
 def list_files():
     """List all available files for download"""
     output_files = []
-    if os.path.exists('output'):
-        all_files = os.listdir('output')
-        output_files = [f for f in all_files if f.endswith(('.xlsx', '.csv', '.json'))]
-        print(f"DEBUG: Found {len(output_files)} files: {output_files}")
-    else:
-        print("DEBUG: Output directory does not exist")
+    # Check multiple possible output directories (prioritize main output dir)
+    possible_output_dirs = ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']
+    
+    for output_dir in possible_output_dirs:
+        if os.path.exists(output_dir):
+            try:
+                all_files = os.listdir(output_dir)
+                files = [f for f in all_files if f.endswith(('.xlsx', '.csv', '.json'))]
+                output_files.extend(files)
+                print(f"DEBUG: Found {len(files)} files in {output_dir}: {files}")
+            except Exception as e:
+                print(f"DEBUG: Error reading {output_dir}: {e}")
+    
+    # Remove duplicates while preserving order
+    output_files = list(dict.fromkeys(output_files))
+    
+    if not output_files:
+        print("DEBUG: No output directories found")
     
     # Also check for the most recent file if no specific files found
     if not output_files and os.path.exists('output'):
@@ -826,14 +838,16 @@ def download_file(filename):
         print(f"DEBUG: Download requested for: {filename}")
         print(f"DEBUG: Decoded filename: {decoded_filename}")
         
-        # Try multiple possible output directories
+        # Try multiple possible output directories (prioritize the ones that actually exist)
         possible_paths = [
+            # First try the main output directory where files actually exist
+            os.path.join('/root/scrapper-v2/output', decoded_filename),  # Main output directory
+            os.path.join('/root/scrapper-v2/output', filename),  # Main output directory encoded
+            # Then try other possible locations
             os.path.join('output', decoded_filename),  # Current directory
             os.path.join('output', filename),  # Original encoded filename
             os.path.join('..', 'output', decoded_filename),  # Parent directory
             os.path.join('..', 'output', filename),  # Parent directory with encoded
-            os.path.join('/root/scrapper-v2/output', decoded_filename),  # Absolute path
-            os.path.join('/root/scrapper-v2/output', filename),  # Absolute path encoded
             os.path.join('/root/scrapper-v2/app/output', decoded_filename),  # App subdirectory
             os.path.join('/root/scrapper-v2/app/output', filename),  # App subdirectory encoded
         ]
@@ -852,17 +866,22 @@ def download_file(filename):
         else:
             print(f"DEBUG: File not found in any expected location")
             
-            # If specific file not found, try to find any recent file
-            if os.path.exists('output'):
-                all_files = os.listdir('output')
-                if all_files:
-                    # Get the most recently modified file
-                    files_with_time = [(f, os.path.getmtime(os.path.join('output', f))) for f in all_files if os.path.isfile(os.path.join('output', f))]
-                    if files_with_time:
-                        most_recent = max(files_with_time, key=lambda x: x[1])
-                        most_recent_path = os.path.join('output', most_recent[0])
-                        print(f"DEBUG: Serving most recent file instead: {most_recent_path}")
-                        return send_file(most_recent_path, as_attachment=True, download_name=most_recent[0])
+            # If specific file not found, try to find any recent file in any output directory
+            for output_dir in ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']:
+                if os.path.exists(output_dir):
+                    try:
+                        all_files = os.listdir(output_dir)
+                        if all_files:
+                            # Get the most recently modified file
+                            files_with_time = [(f, os.path.getmtime(os.path.join(output_dir, f))) for f in all_files if os.path.isfile(os.path.join(output_dir, f))]
+                            if files_with_time:
+                                most_recent = max(files_with_time, key=lambda x: x[1])
+                                most_recent_path = os.path.join(output_dir, most_recent[0])
+                                print(f"DEBUG: Serving most recent file instead: {most_recent_path}")
+                                return send_file(most_recent_path, as_attachment=True, download_name=most_recent[0])
+                    except Exception as e:
+                        print(f"DEBUG: Error checking {output_dir}: {e}")
+                        continue
             
             # Check what directories and files actually exist
             debug_info = {
