@@ -113,7 +113,7 @@ class ImprovedBackend(Base):
             Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
             
             # Force WebDriver Manager to get the correct version for Chrome 141
-            driver_path = ChromeDriverManager(version="141.0.6772.85").install()
+            driver_path = ChromeDriverManager(driver_version="141.0.6772.85").install()
             Communicator.show_message(f"ChromeDriver path: {driver_path}")
             
             self.driver = uc.Chrome(
