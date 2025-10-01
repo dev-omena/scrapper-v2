@@ -221,6 +221,51 @@ class ImprovedBackend(Base):
                     Communicator.show_message("Suggestion: Try running without headless mode or from a different IP/location.")
                     return
             
+            # Handle redirect to single place page (common issue with Google Maps)
+            if '/maps/place/' in current_url:
+                Communicator.show_message("WARNING: Google Maps redirected to a single place instead of search results")
+                print("DEBUG: Redirected to place page, trying alternative approaches")
+                
+                # Try alternative search approaches
+                alternative_urls = [
+                    # Try with different parameters
+                    f"https://www.google.com/maps/search/{encoded_query}/@0,0,2z",
+                    f"https://www.google.com/maps/search/{encoded_query}/?hl=en",
+                    f"https://www.google.com/maps/search/{encoded_query}/?entry=ttu",
+                    # Try with broader search
+                    f"https://www.google.com/maps/search/{encoded_query.split('+')[0]}/",
+                ]
+                
+                for alt_url in alternative_urls:
+                    try:
+                        Communicator.show_message(f"Trying alternative URL: {alt_url[:80]}...")
+                        print(f"DEBUG: Trying alternative URL: {alt_url}")
+                        
+                        self.driver.get(alt_url)
+                        sleep(5)
+                        
+                        new_url = self.driver.current_url
+                        new_title = self.driver.title
+                        
+                        Communicator.show_message(f"Alternative URL result: {new_title}")
+                        print(f"DEBUG: New URL: {new_url[:100]}")
+                        
+                        # If we're now on search results or a different place, try scrolling
+                        if '/maps/search/' in new_url or '/maps/place/' not in new_url:
+                            Communicator.show_message("Alternative URL worked, proceeding with scraping...")
+                            break
+                            
+                    except Exception as e:
+                        Communicator.show_message(f"Alternative URL failed: {str(e)}")
+                        continue
+                
+                # Check final URL after trying alternatives
+                final_url = self.driver.current_url
+                if '/maps/place/' in final_url:
+                    Communicator.show_message("ERROR: All alternative approaches failed - still on single place page")
+                    Communicator.show_message("This search query may only have one result or Google is showing a featured result")
+                    return
+            
             # Start scrolling and scraping
             Communicator.show_message("DEBUG: About to call scroller.scroll()")
             print("DEBUG: About to call scroller.scroll()")
