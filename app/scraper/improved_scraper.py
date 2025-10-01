@@ -35,7 +35,7 @@ class ImprovedBackend(Base):
         if self.headlessMode == 1:
             options.headless = True
 
-        # Add Chrome options for Railway compatibility
+        # Essential Chrome options
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
@@ -43,116 +43,108 @@ class ImprovedBackend(Base):
         options.add_argument('--window-size=1920,1080')
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         options.add_argument('--disable-blink-features=AutomationControlled')
-        
-        # Anti-detection and consent bypass options
-        options.add_argument('--disable-web-security')
-        options.add_argument('--disable-features=VizDisplayCompositor,VizServiceDisplayCompositor')
-        options.add_argument('--disable-extensions-file-access-check')
-        options.add_argument('--disable-extensions-http-throttling')
-        options.add_argument('--disable-component-extensions-with-background-pages')
-        options.add_argument('--disable-default-apps')
-        options.add_argument('--disable-component-update')
-        options.add_argument('--disable-client-side-phishing-detection')
-        options.add_argument('--disable-sync-preferences')
-        options.add_argument('--disable-background-mode')
-        options.add_argument('--disable-features=TranslateUI')
-        options.add_argument('--disable-ipc-flooding-protection')
-        options.add_argument('--disable-hang-monitor')
-        options.add_argument('--disable-prompt-on-repost')
-        options.add_argument('--disable-domain-reliability')
-        options.add_argument('--disable-background-networking')
-        options.add_argument('--disable-sync')
-        options.add_argument('--disable-translate')
-        options.add_argument('--disable-logging')
-        options.add_argument('--disable-permissions-api')
-        options.add_argument('--disable-notifications')
-        options.add_argument('--disable-plugins-discovery')
-        options.add_argument('--disable-preconnect')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        
-        # Additional privacy settings to bypass consent
-        options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--no-first-run')
         options.add_argument('--no-default-browser-check')
-        options.add_argument('--disable-default-apps')
         options.add_argument('--disable-popup-blocking')
-        options.add_argument('--disable-prompt-on-repost')
-        options.add_argument('--disable-hang-monitor')
-        options.add_argument('--disable-client-side-phishing-detection')
-        options.add_argument('--disable-sync-preferences')
-        options.add_argument('--disable-background-mode')
-        options.add_argument('--disable-features=TranslateUI')
-        options.add_argument('--disable-ipc-flooding-protection')
-        options.add_argument('--disable-hang-monitor')
-        options.add_argument('--disable-prompt-on-repost')
-        options.add_argument('--disable-domain-reliability')
-        options.add_argument('--disable-background-networking')
-        options.add_argument('--disable-sync')
-        options.add_argument('--disable-translate')
-        options.add_argument('--disable-logging')
-        options.add_argument('--disable-permissions-api')
-        options.add_argument('--disable-notifications')
-        options.add_argument('--disable-plugins-discovery')
-        options.add_argument('--disable-preconnect')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-backgrounding-occluded-windows')
         
         # Disable images for faster loading
-        prefs = {"profile.managed_default_content_settings.images": 2}
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.notifications": 2
+        }
         options.add_experimental_option("prefs", prefs)
 
         Communicator.show_message("Initializing Chrome driver...")
         
         try:
-            # Use WebDriver Manager to automatically handle ChromeDriver version matching
-            Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
-            
-            # Get Chrome version first
-            chrome_version = self.get_chrome_version()
-            Communicator.show_message(f"Detected Chrome version: {chrome_version}")
-            
-            # Force WebDriver Manager to get the correct version
-            if chrome_version == "141":
-                # For Chrome 141, try to get the latest ChromeDriver 141
-                try:
-                    driver_path = ChromeDriverManager(driver_version="141.0.6772.85").install()
-                except:
-                    # If specific version fails, try latest 141
-                    driver_path = ChromeDriverManager(driver_version="141").install()
-            else:
-                # For other versions, let it auto-detect
-                driver_path = ChromeDriverManager().install()
-            
-            Communicator.show_message(f"ChromeDriver path: {driver_path}")
-            
-            self.driver = uc.Chrome(
-                driver_executable_path=driver_path, 
-                options=options
-            )
-            Communicator.show_message("Chrome driver initialized successfully with WebDriver Manager")
-            
-        except Exception as e:
-            Communicator.show_message(f"WebDriver Manager failed: {str(e)}")
-            raise e  # Don't fallback, let it fail so we can fix the real issue
-    
-    def get_chrome_version(self):
-        """Get installed Chrome version"""
-        try:
+            # Get Chrome version
             import subprocess
-            result = subprocess.run(['/opt/google/chrome/chrome', '--version'], 
-                                  capture_output=True, text=True)
-            version_line = result.stdout.strip()
-            # Extract version number (e.g., "Chrome 141.0.7390.54" -> "141")
-            version = version_line.split()[1].split('.')[0]
-            return version
+            import re
+            
+            chrome_version_full = None
+            chrome_major_version = None
+            
+            try:
+                chrome_version_output = subprocess.check_output(["/opt/google/chrome/chrome", "--version"]).decode().strip()
+                Communicator.show_message(f"Chrome version: {chrome_version_output}")
+                print(f"DEBUG: Chrome version output: {chrome_version_output}")
+                
+                # Extract version number (e.g., "141.0.7390.54" from "Google Chrome 141.0.7390.54")
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', chrome_version_output)
+                if version_match:
+                    chrome_version_full = version_match.group(0)
+                    chrome_major_version = int(version_match.group(1))
+                    Communicator.show_message(f"Detected Chrome version: {chrome_version_full} (major: {chrome_major_version})")
+                    print(f"DEBUG: Parsed Chrome version: {chrome_version_full}, major: {chrome_major_version}")
+            except Exception as e:
+                Communicator.show_message(f"Could not determine Chrome version: {str(e)}")
+                print(f"DEBUG: Error getting Chrome version: {str(e)}")
+            
+            # Strategy 1: Let undetected_chromedriver handle everything (BEST for latest Chrome)
+            Communicator.show_message("Using undetected_chromedriver auto-mode (recommended for Chrome 141+)...")
+            print("DEBUG: Attempting undetected_chromedriver auto-mode")
+            
+            try:
+                # undetected_chromedriver will automatically download the correct driver
+                self.driver = uc.Chrome(
+                    options=options,
+                    version_main=chrome_major_version if chrome_major_version else None
+                )
+                Communicator.show_message("Chrome driver initialized successfully (auto-mode)")
+                print("DEBUG: undetected_chromedriver auto-mode succeeded")
+                
+            except Exception as uc_error:
+                Communicator.show_message(f"Auto-mode failed: {str(uc_error)}")
+                print(f"DEBUG: undetected_chromedriver auto-mode failed: {str(uc_error)}")
+                
+                # Strategy 2: Try WebDriver Manager with specific version
+                if chrome_major_version:
+                    try:
+                        Communicator.show_message(f"Trying WebDriver Manager for Chrome {chrome_major_version}...")
+                        print(f"DEBUG: Trying WebDriver Manager with version {chrome_major_version}")
+                        
+                        # Try to get the specific driver version
+                        from webdriver_manager.core.utils import ChromeType
+                        driver_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
+                        
+                        Communicator.show_message(f"ChromeDriver path: {driver_path}")
+                        print(f"DEBUG: ChromeDriver path: {driver_path}")
+                        
+                        self.driver = uc.Chrome(
+                            driver_executable_path=driver_path,
+                            options=options
+                        )
+                        Communicator.show_message("Chrome driver initialized with WebDriver Manager")
+                        print("DEBUG: WebDriver Manager succeeded")
+                        
+                    except Exception as wdm_error:
+                        Communicator.show_message(f"WebDriver Manager failed: {str(wdm_error)}")
+                        print(f"DEBUG: WebDriver Manager failed: {str(wdm_error)}")
+                        
+                        # Strategy 3: Manual path as last resort
+                        if DRIVER_EXECUTABLE_PATH is not None:
+                            Communicator.show_message("Trying manual ChromeDriver path...")
+                            self.driver = uc.Chrome(
+                                driver_executable_path=DRIVER_EXECUTABLE_PATH,
+                                options=options
+                            )
+                            Communicator.show_message("Chrome driver initialized (manual path)")
+                        else:
+                            raise wdm_error
+                else:
+                    raise uc_error
+                    
         except Exception as e:
-            print(f"Could not detect Chrome version: {e}")
-            return "141"  # Default fallback
+            error_msg = f"Chrome driver initialization failed: {str(e)}"
+            Communicator.show_message(error_msg)
+            print(f"ERROR: {error_msg}")
+            
+            # Provide helpful error message
+            if "version" in str(e).lower():
+                Communicator.show_message("TIP: Chrome and ChromeDriver versions must match!")
+                Communicator.show_message("Try: pip install --upgrade undetected-chromedriver")
+            
+            raise e
         
         self.driver.maximize_window()
         self.driver.implicitly_wait(self.timeout)
@@ -161,16 +153,6 @@ class ImprovedBackend(Base):
         """Format search query for better Google Maps results"""
         # Remove extra spaces and format
         query = ' '.join(query.split())
-        
-        # Add location context if not present
-        location_indicators = ['في', 'in', 'at', 'near', 'close to']
-        has_location = any(indicator in query.lower() for indicator in location_indicators)
-        
-        if not has_location:
-            Communicator.show_message("Adding location context to search query...")
-            # You can customize this based on your needs
-            query = f"{query} near me"
-        
         return query
 
     def mainscraping(self):
@@ -189,16 +171,9 @@ class ImprovedBackend(Base):
             self.openingurl(url=link_of_page)
             
             Communicator.show_message("Page loaded, starting search...")
-            sleep(5)  # Give more time for the page to load
             
-            # Debug: Save page source for analysis
-            try:
-                with open('/tmp/maps_page.html', 'w', encoding='utf-8') as f:
-                    f.write(self.driver.page_source)
-                print("DEBUG: Page source saved to /tmp/maps_page.html")
-                Communicator.show_message("DEBUG: Page source saved for analysis")
-            except Exception as e:
-                print(f"DEBUG: Could not save page source: {e}")
+            # Single wait time - reduced from multiple waits
+            sleep(5)  # One consolidated wait for page to fully load
             
             # Check if we're on the right page
             current_url = self.driver.current_url
@@ -208,137 +183,43 @@ class ImprovedBackend(Base):
             page_title = self.driver.title
             Communicator.show_message(f"Page title: {page_title}")
             
-            # Check if we're on a specific place page instead of search results
-            if "/maps/place/" in current_url:
-                Communicator.show_message("Detected specific place page, trying to get back to search results...")
-                print("DEBUG: Detected specific place page, trying to get back to search results")
+            # Handle Google consent page
+            if "consent.google.com" in current_url:
+                Communicator.show_message("WARNING: Detected consent page - Google may be blocking automated access")
+                print("DEBUG: On consent page - this is a blocking issue")
                 
+                # Try to click reject/accept buttons
                 try:
-                    # Try to find and click "Back" or "Search results" button
-                    back_selectors = [
-                        "button[aria-label*='Back']",
-                        "button[aria-label*='Close']", 
-                        "button[jsaction*='back']",
-                        "[data-value='Search results']",
-                        "button.gm2-button-icon"
+                    # Try to find and click accept button
+                    accept_selectors = [
+                        "button[aria-label*='Accept']",
+                        "button[aria-label*='agree']",
+                        "button[aria-label*='Agree']",
+                        "button:contains('Accept')",
+                        "form[action*='consent'] button[type='submit']"
                     ]
                     
-                    for selector in back_selectors:
+                    for selector in accept_selectors:
                         try:
-                            back_btn = self.driver.find_element("css selector", selector)
-                            if back_btn and back_btn.is_displayed():
-                                print(f"DEBUG: Found back button with selector: {selector}")
-                                back_btn.click()
-                                time.sleep(2)
-                                break
+                            button = self.driver.find_element("css selector", selector)
+                            if button:
+                                button.click()
+                                sleep(2)
+                                
+                                if "consent.google.com" not in self.driver.current_url:
+                                    Communicator.show_message("Successfully bypassed consent page!")
+                                    break
                         except:
                             continue
                     
-                    # If no back button found, try browser back
-                    if "/maps/place/" in self.driver.current_url:
-                        print("DEBUG: Using browser back")
-                        self.driver.back()
-                        time.sleep(2)
-                    
-                    # Check if we're back to search results
-                    current_url = self.driver.current_url
-                    if "/maps/search/" in current_url:
-                        Communicator.show_message("Successfully returned to search results")
-                        print("DEBUG: Successfully returned to search results")
-                    else:
-                        Communicator.show_message("Could not return to search results, will try alternative approach")
-                        print("DEBUG: Could not return to search results")
-                        
                 except Exception as e:
-                    Communicator.show_message(f"Error handling place page redirect: {str(e)}")
-                    print(f"DEBUG: Error handling place page redirect: {str(e)}")
-            
-            # Handle Google consent page - ALTERNATIVE SEARCH APPROACH
-            if "consent.google.com" in current_url or "Voordat je verdergaat" in page_title:
-                Communicator.show_message("Detected consent page, trying alternative search approach...")
-                print("DEBUG: Detected consent page, trying alternative search approach")
+                    print(f"DEBUG: Could not bypass consent: {str(e)}")
                 
-                # Try alternative search methods that don't trigger consent
-                alternative_approaches = [
-                    # Method 1: Direct Google search with site:maps.google.com
-                    f"https://www.google.com/search?q=site:maps.google.com+{encoded_query}",
-                    # Method 2: Google search with maps filter
-                    f"https://www.google.com/search?q={encoded_query}&tbm=lcl",
-                    # Method 3: Direct maps URL with different parameters
-                    f"https://www.google.com/maps/search/{encoded_query}/?hl=en&gl=US",
-                    # Method 4: Try with different user agent
-                    f"https://www.google.com/maps/search/{encoded_query}/?hl=en"
-                ]
-                
-                for i, approach_url in enumerate(alternative_approaches):
-                    try:
-                        Communicator.show_message(f"Trying alternative approach {i+1}: {approach_url}")
-                        print(f"DEBUG: Trying alternative approach {i+1}: {approach_url}")
-                        
-                        # For approach 1 and 2, we need to handle Google search results
-                        if "google.com/search" in approach_url:
-                            self.driver.get(approach_url)
-                            time.sleep(5)
-                            
-                            # Try to find and click on maps results
-                            try:
-                                maps_links = self.driver.find_elements("css selector", "a[href*='maps.google.com']")
-                                if maps_links:
-                                    Communicator.show_message(f"Found {len(maps_links)} maps links, clicking first one...")
-                                    print(f"DEBUG: Found {len(maps_links)} maps links, clicking first one")
-                                    maps_links[0].click()
-                                    time.sleep(3)
-                                    
-                                    current_url = self.driver.current_url
-                                    if "consent.google.com" not in current_url and "maps.google.com" in current_url:
-                                        Communicator.show_message("Successfully reached maps via search results!")
-                                        print("DEBUG: Successfully reached maps via search results!")
-                                        break
-                            except Exception as e:
-                                Communicator.show_message(f"Error clicking maps link: {str(e)}")
-                                print(f"DEBUG: Error clicking maps link: {str(e)}")
-                        else:
-                            # Direct maps approach
-                            self.driver.get(approach_url)
-                            time.sleep(3)
-                            
-                            current_url = self.driver.current_url
-                            page_title = self.driver.title
-                            
-                            Communicator.show_message(f"After approach {i+1}, URL: {current_url}")
-                            Communicator.show_message(f"Page title: {page_title}")
-                            print(f"DEBUG: After approach {i+1} - URL: {current_url}, Title: {page_title}")
-                            
-                            # Check if we successfully reached search results
-                            if "consent.google.com" not in current_url and "maps.google.com" in current_url:
-                                Communicator.show_message("Successfully bypassed consent, reached search results!")
-                                print("DEBUG: Successfully bypassed consent, reached search results!")
-                                break
-                            elif "consent.google.com" not in current_url:
-                                Communicator.show_message("Successfully bypassed consent!")
-                                print("DEBUG: Successfully bypassed consent!")
-                                break
-                                
-                    except Exception as e:
-                        Communicator.show_message(f"Alternative approach {i+1} failed: {str(e)}")
-                        print(f"DEBUG: Alternative approach {i+1} failed: {str(e)}")
-                        continue
-                
-                # Final check - if still on consent page, try to proceed with mock data
-                current_url = self.driver.current_url
-                if "consent.google.com" in current_url:
-                    Communicator.show_message("All approaches failed, consent page cannot be bypassed...")
-                    print("DEBUG: All approaches failed, consent page cannot be bypassed")
-                    
-                    # Create mock data to show the user that the scraper is working
-                    Communicator.show_message("Creating mock data to demonstrate scraper functionality...")
-                    print("DEBUG: Creating mock data to demonstrate scraper functionality")
-                    
-                    # This will be handled in the scroller - it will create mock data
-                    return  # Exit early to let the scroller handle mock data
-                else:
-                    Communicator.show_message("Successfully reached search results page!")
-                    print("DEBUG: Successfully reached search results page!")
+                # If still on consent page, we can't proceed
+                if "consent.google.com" in self.driver.current_url:
+                    Communicator.show_message("ERROR: Cannot bypass consent page. Google is blocking automated access.")
+                    Communicator.show_message("Suggestion: Try running without headless mode or from a different IP/location.")
+                    return
             
             # Start scrolling and scraping
             Communicator.show_message("DEBUG: About to call scroller.scroll()")
@@ -349,12 +230,15 @@ class ImprovedBackend(Base):
             
         except Exception as e:
             Communicator.show_message(f"Error occurred while scraping. Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
             # Try to get more debug information
             try:
                 current_url = self.driver.current_url
-                page_source = self.driver.page_source[:500]  # First 500 chars
+                page_source = self.driver.page_source[:500]
                 Communicator.show_message(f"Debug - Current URL: {current_url}")
-                Communicator.show_message(f"Debug - Page source preview: {page_source}")
+                print(f"DEBUG - Page source preview: {page_source}")
             except:
                 pass
 
