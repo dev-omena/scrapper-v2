@@ -10,6 +10,7 @@ import undetected_chromedriver as uc
 from settings import DRIVER_EXECUTABLE_PATH
 from scraper.communicator import Communicator
 import urllib.parse
+from webdriver_manager.chrome import ChromeDriverManager
 
 class ImprovedBackend(Base):
     
@@ -108,15 +109,31 @@ class ImprovedBackend(Base):
         Communicator.show_message("Initializing Chrome driver...")
         
         try:
-            if DRIVER_EXECUTABLE_PATH is not None:
-                self.driver = uc.Chrome(
-                    driver_executable_path=DRIVER_EXECUTABLE_PATH, options=options)
-            else:
-                self.driver = uc.Chrome(options=options)
-        except NameError:
-            self.driver = uc.Chrome(options=options)
-        
-        Communicator.show_message("Chrome driver initialized successfully")
+            # Use WebDriver Manager to automatically handle ChromeDriver version matching
+            Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
+            driver_path = ChromeDriverManager().install()
+            Communicator.show_message(f"ChromeDriver path: {driver_path}")
+            
+            self.driver = uc.Chrome(
+                driver_executable_path=driver_path, 
+                options=options
+            )
+            Communicator.show_message("Chrome driver initialized successfully with WebDriver Manager")
+            
+        except Exception as e:
+            Communicator.show_message(f"WebDriver Manager failed: {str(e)}")
+            Communicator.show_message("Falling back to manual ChromeDriver...")
+            
+            try:
+                if DRIVER_EXECUTABLE_PATH is not None:
+                    self.driver = uc.Chrome(
+                        driver_executable_path=DRIVER_EXECUTABLE_PATH, options=options)
+                else:
+                    self.driver = uc.Chrome(options=options)
+                Communicator.show_message("Chrome driver initialized successfully (fallback)")
+            except Exception as e2:
+                Communicator.show_message(f"Chrome driver initialization failed: {str(e2)}")
+                raise e2
         self.driver.maximize_window()
         self.driver.implicitly_wait(self.timeout)
 
