@@ -556,11 +556,45 @@ def index():
                         this.downloadExcel.textContent = `📊 Download ${data.output_file}`;
                         this.downloadExcel.style.display = 'inline-block';
                     } else {
-                        // No files available
-                        this.downloadExcel.textContent = 'No files available';
-                        this.downloadExcel.style.display = 'none';
-                        this.downloadCsv.style.display = 'none';
-                        this.downloadJson.style.display = 'none';
+                        // No files available - try to fetch from /files endpoint
+                        console.log('No files in status response, trying /files endpoint...');
+                        this.fetchAvailableFiles();
+                    }
+                }
+
+                async fetchAvailableFiles() {
+                    try {
+                        console.log('Fetching available files from /files endpoint...');
+                        const response = await fetch('/files');
+                        const data = await response.json();
+                        console.log('Files response:', data);
+                        
+                        const files = data.files || [];
+                        if (files.length > 0) {
+                            files.forEach(file => {
+                                if (file.endsWith('.xlsx')) {
+                                    this.downloadExcel.href = `/download/${encodeURIComponent(file)}`;
+                                    this.downloadExcel.textContent = `📊 Download ${file}`;
+                                    this.downloadExcel.style.display = 'inline-block';
+                                } else if (file.endsWith('.csv')) {
+                                    this.downloadCsv.href = `/download/${encodeURIComponent(file)}`;
+                                    this.downloadCsv.textContent = `📄 Download ${file}`;
+                                    this.downloadCsv.style.display = 'inline-block';
+                                } else if (file.endsWith('.json')) {
+                                    this.downloadJson.href = `/download/${encodeURIComponent(file)}`;
+                                    this.downloadJson.textContent = `📋 Download ${file}`;
+                                    this.downloadJson.style.display = 'inline-block';
+                                }
+                            });
+                        } else {
+                            console.log('No files found in /files endpoint');
+                            this.downloadExcel.textContent = 'No files available';
+                            this.downloadExcel.style.display = 'none';
+                            this.downloadCsv.style.display = 'none';
+                            this.downloadJson.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error('Error fetching files:', error);
                     }
                 }
             }
