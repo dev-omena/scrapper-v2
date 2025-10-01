@@ -112,8 +112,22 @@ class ImprovedBackend(Base):
             # Use WebDriver Manager to automatically handle ChromeDriver version matching
             Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
             
-            # Let WebDriver Manager auto-detect the correct version for Chrome 141
-            driver_path = ChromeDriverManager().install()
+            # Get Chrome version first
+            chrome_version = self.get_chrome_version()
+            Communicator.show_message(f"Detected Chrome version: {chrome_version}")
+            
+            # Force WebDriver Manager to get the correct version
+            if chrome_version == "141":
+                # For Chrome 141, try to get the latest ChromeDriver 141
+                try:
+                    driver_path = ChromeDriverManager(driver_version="141.0.6772.85").install()
+                except:
+                    # If specific version fails, try latest 141
+                    driver_path = ChromeDriverManager(driver_version="141").install()
+            else:
+                # For other versions, let it auto-detect
+                driver_path = ChromeDriverManager().install()
+            
             Communicator.show_message(f"ChromeDriver path: {driver_path}")
             
             self.driver = uc.Chrome(
@@ -124,30 +138,22 @@ class ImprovedBackend(Base):
             
         except Exception as e:
             Communicator.show_message(f"WebDriver Manager failed: {str(e)}")
-            Communicator.show_message("Falling back to manual ChromeDriver...")
-            
-            try:
-                # Create new options object for fallback
-                fallback_options = uc.ChromeOptions()
-                fallback_options.binary_location = "/opt/google/chrome/chrome"
-                
-                if self.headlessMode == 1:
-                    fallback_options.headless = True
-                
-                # Add essential options for fallback
-                fallback_options.add_argument('--no-sandbox')
-                fallback_options.add_argument('--disable-dev-shm-usage')
-                fallback_options.add_argument('--disable-gpu')
-                
-                if DRIVER_EXECUTABLE_PATH is not None:
-                    self.driver = uc.Chrome(
-                        driver_executable_path=DRIVER_EXECUTABLE_PATH, options=fallback_options)
-                else:
-                    self.driver = uc.Chrome(options=fallback_options)
-                Communicator.show_message("Chrome driver initialized successfully (fallback)")
-            except Exception as e2:
-                Communicator.show_message(f"Chrome driver initialization failed: {str(e2)}")
-                raise e2
+            raise e  # Don't fallback, let it fail so we can fix the real issue
+    
+    def get_chrome_version(self):
+        """Get installed Chrome version"""
+        try:
+            import subprocess
+            result = subprocess.run(['/opt/google/chrome/chrome', '--version'], 
+                                  capture_output=True, text=True)
+            version_line = result.stdout.strip()
+            # Extract version number (e.g., "Chrome 141.0.7390.54" -> "141")
+            version = version_line.split()[1].split('.')[0]
+            return version
+        except Exception as e:
+            print(f"Could not detect Chrome version: {e}")
+            return "141"  # Default fallback
+        
         self.driver.maximize_window()
         self.driver.implicitly_wait(self.timeout)
 
