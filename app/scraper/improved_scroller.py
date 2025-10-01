@@ -343,7 +343,7 @@ class ImprovedScroller:
             return []
     
     def scroll(self):
-        """Improved scrolling with better error handling"""
+        """Improved scrolling with better error handling and continuous scrolling"""
         
         Communicator.show_message("DEBUG: Starting scroller.scroll() method")
         print("DEBUG: Starting scroller.scroll() method")
@@ -359,29 +359,87 @@ class ImprovedScroller:
         if scrollAbleElement is None:
             Communicator.show_message("ERROR: Could not find search results container")
             print("ERROR: Could not find search results container")
+            return
         
-        # Try to proceed anyway - maybe we can extract results directly
-        print("DEBUG: Attempting to extract results directly from page...")
+        # Extract initial results
+        self.extract_results_from_page()
+        
+        # If we have results, continue scrolling to get more
+        if len(self.all_results_links) > 0:
+            Communicator.show_message(f"Found {len(self.all_results_links)} initial results, starting to scroll for more...")
+            print(f"DEBUG: Starting to scroll with {len(self.all_results_links)} initial results")
+            
+            # Start the scrolling process
+            self.perform_scrolling(scrollAbleElement)
+        
+        # Final extraction and parsing
+        if len(self.all_results_links) > 0:
+            Communicator.show_message(f"Scrolling complete. Total results collected: {len(self.all_results_links)}")
+            print(f"DEBUG: Final result count: {len(self.all_results_links)}")
+            self.start_parsing()
+        else:
+            Communicator.show_message("No results found after scrolling")
+            print("DEBUG: No results found")
+    
+    def extract_results_from_page(self):
+        """Extract all results currently visible on the page"""
         try:
             # Look for any place links on the page
             all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
             if len(all_links) > 0:
-                print(f"DEBUG: Found {len(all_links)} place links, proceeding with extraction")
-                Communicator.show_message(f"Found {len(all_links)} results directly from page")
+                print(f"DEBUG: Found {len(all_links)} place links on page")
                 # Add all found links to results
                 for link in all_links:
                     href = link.get_attribute('href')
                     if href and href not in self.all_results_links:
                         self.all_results_links.append(href)
-                
-                if len(self.all_results_links) > 0:
-                    print(f"DEBUG: Starting parsing with {len(self.all_results_links)} results")
-                    self.start_parsing()
-                    return
+                print(f"DEBUG: Total unique results now: {len(self.all_results_links)}")
         except Exception as e:
-            print(f"DEBUG: Direct extraction failed: {str(e)}")
+            print(f"DEBUG: Error extracting results: {str(e)}")
+    
+    def perform_scrolling(self, scrollable_element):
+        """Perform the actual scrolling to load more results"""
+        max_scrolls = 20  # Limit to prevent infinite scrolling
+        scroll_count = 0
+        no_new_results_count = 0
         
-        return
+        while scroll_count < max_scrolls and no_new_results_count < 3:
+            scroll_count += 1
+            previous_count = len(self.all_results_links)
+            
+            try:
+                # Scroll down
+                if scrollable_element and scrollable_element != "CONTINUE_SCROLLING":
+                    self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollTop + 1000", scrollable_element)
+                else:
+                    # Fallback: scroll the page
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                
+                # Wait for new content to load
+                time.sleep(2)
+                
+                # Extract new results
+                self.extract_results_from_page()
+                
+                new_count = len(self.all_results_links)
+                if new_count > previous_count:
+                    no_new_results_count = 0  # Reset counter
+                    Communicator.show_message(f"Found {new_count - previous_count} new results (total: {new_count})")
+                    print(f"DEBUG: Scroll {scroll_count}: Found {new_count - previous_count} new results")
+                else:
+                    no_new_results_count += 1
+                    print(f"DEBUG: Scroll {scroll_count}: No new results found ({no_new_results_count}/3)")
+                
+                # Show progress every few scrolls
+                if scroll_count % 3 == 0:
+                    Communicator.show_message(f"Scrolled {scroll_count} times, found {new_count} results so far...")
+                
+            except Exception as e:
+                print(f"DEBUG: Error during scroll {scroll_count}: {str(e)}")
+                break
+        
+        Communicator.show_message(f"Scrolling completed after {scroll_count} attempts")
+        print(f"DEBUG: Scrolling completed. Total scrolls: {scroll_count}, Final results: {len(self.all_results_links)}")
         
         # Check if we already have a single result from redirect handling
         if scrollAbleElement == "SINGLE_RESULT":
