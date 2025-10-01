@@ -43,53 +43,35 @@ class ImprovedScroller:
                 Communicator.show_message("Detected redirect to single place, going back to search results...")
                 print("DEBUG: On a place page, need to go back to search results")
                 
-                # Click the back button or search button to get back to results
+                # Strategy 1: Try browser back
                 try:
-                    # Try to find and click the back/close button
-                    back_button_selectors = [
-                        "button[aria-label*='Back']",
-                        "button[aria-label*='Close']",
-                        "button[jsaction*='back']",
-                        "button.gm2-button-icon[aria-label]"
-                    ]
+                    print("DEBUG: Trying browser back...")
+                    self.driver.back()
+                    time.sleep(3)
                     
-                    for selector in back_button_selectors:
-                        try:
-                            back_btn = self.driver.find_element("css selector", selector)
-                            if back_btn:
-                                print(f"DEBUG: Found back button with selector: {selector}")
-                                back_btn.click()
-                                time.sleep(2)
-                                
-                                # Check if we're now on search results
-                                new_url = self.driver.current_url
-                                if '/maps/search/' in new_url:
-                                    Communicator.show_message("Successfully returned to search results")
-                                    print("DEBUG: Back to search results page")
-                                    return True
-                                break
-                        except:
-                            continue
+                    new_url = self.driver.current_url
+                    print(f"DEBUG: After back, URL: {new_url}")
                     
-                    # If clicking back didn't work, try browser back
-                    if '/maps/place/' in self.driver.current_url:
-                        print("DEBUG: Trying browser back")
-                        self.driver.back()
-                        time.sleep(2)
-                        
-                        if '/maps/search/' in self.driver.current_url:
-                            Communicator.show_message("Used browser back to return to search results")
-                            return True
+                    if '/maps/search/' in new_url:
+                        Communicator.show_message("Successfully returned to search results using back button")
+                        print("DEBUG: Back button worked - now on search results")
+                        return True
                     
                 except Exception as e:
-                    print(f"DEBUG: Error clicking back: {str(e)}")
+                    print(f"DEBUG: Browser back failed: {str(e)}")
                 
-                # If we still can't get back to search results, the current place is the only result
+                # Strategy 2: If we're still on a place page, this might be the ONLY result
+                # Just scrape this one place
                 if '/maps/place/' in self.driver.current_url:
-                    Communicator.show_message("Only one result found, will scrape this single place")
-                    print("DEBUG: Only single result exists")
+                    Communicator.show_message("Only one result found - will scrape this single place")
+                    print("DEBUG: Only single result exists, adding to list")
+                    
                     # Add this single place URL to results
-                    self.all_results_links.append(self.driver.current_url)
+                    place_url = self.driver.current_url
+                    if place_url not in self.all_results_links:
+                        self.all_results_links.append(place_url)
+                        print(f"DEBUG: Added single place: {place_url}")
+                    
                     return True
                     
         except Exception as e:
@@ -99,10 +81,30 @@ class ImprovedScroller:
         
         return False
     
-    def wait_for_search_results(self, timeout=30):
+    def wait_for_search_results(self, timeout=60):
         """Wait for search results to load with better detection"""
         Communicator.show_message("Waiting for search results to load...")
+        print("DEBUG: wait_for_search_results() started")
         
+        # First, do a quick check without waiting
+        print("DEBUG: Attempting immediate result detection...")
+        try:
+            quick_selectors = ["[role='feed']", ".m6QErb", "div.m6QErb"]
+            for selector in quick_selectors:
+                try:
+                    element = self.driver.find_element("css selector", selector)
+                    if element and element.is_displayed():
+                        html = element.get_attribute('outerHTML')
+                        if html and len(html) > 100:
+                            print(f"DEBUG: Quick check found results immediately with {selector}")
+                            Communicator.show_message(f"Results found immediately!")
+                            return element
+                except:
+                    continue
+        except Exception as e:
+            print(f"DEBUG: Quick check failed: {str(e)}")
+        
+        print("DEBUG: Starting timed wait loop...")
         start_time = time.time()
         attempt = 0
         
@@ -110,14 +112,16 @@ class ImprovedScroller:
             attempt += 1
             elapsed = int(time.time() - start_time)
             
-            if attempt % 5 == 0:
+            if attempt % 3 == 0:  # More frequent updates
                 print(f"DEBUG: Wait attempt {attempt}, elapsed {elapsed}s")
-                Communicator.show_message(f"Still waiting... ({elapsed}s elapsed)")
+                Communicator.show_message(f"Still waiting for results... ({elapsed}s)")
             
             try:
-                # Check if we're still on consent page
+                # Check current URL
                 current_url = self.driver.current_url
-                print(f"DEBUG: Current URL: {current_url[:100]}...")
+                
+                if attempt % 5 == 0:
+                    print(f"DEBUG: Current URL: {current_url[:100]}...")
                 
                 if "consent.google.com" in current_url:
                     Communicator.show_message("ERROR: Still on consent page - cannot access Google Maps")
@@ -128,14 +132,26 @@ class ImprovedScroller:
                 if '/maps/place/' in current_url:
                     print("DEBUG: Detected place page redirect")
                     Communicator.show_message("Detected redirect to place page, handling...")
+                    
                     if self.handle_direct_place_redirect():
-                        # If we successfully handled it, continue waiting for results
                         current_url = self.driver.current_url
+                        print(f"DEBUG: After handling redirect, URL: {current_url}")
+                        
+                        # Check if we now have results
                         if len(self.all_results_links) > 0:
-                            # We have the single result, return a dummy element
+                            print(f"DEBUG: Have {len(self.all_results_links)} results after redirect handling")
+                            Communicator.show_message(f"Found {len(self.all_results_links)} result(s)")
                             return "SINGLE_RESULT"
-                    else:
-                        continue
+                        
+                        # If we're back on search page, continue looking for results
+                        if '/maps/search/' in current_url:
+                            print("DEBUG: Back on search page, continuing to look for results...")
+                            time.sleep(2)  # Give page time to load
+                            continue
+                    
+                    # If handling failed, wait and retry
+                    time.sleep(1)
+                    continue
                 
                 # Try multiple selectors for search results
                 selectors = [
@@ -153,94 +169,56 @@ class ImprovedScroller:
                         element = self.driver.find_element("css selector", selector)
                         
                         if element and element.is_displayed():
-                            print(f"DEBUG: Found element with selector: {selector}")
+                            if attempt % 5 == 0:
+                                print(f"DEBUG: Found element with selector: {selector}")
                             
                             # Get element info
                             try:
                                 html = element.get_attribute('outerHTML')
-                                html_preview = html[:200] if html else "None"
-                                print(f"DEBUG: Element HTML preview: {html_preview}...")
                                 
                                 # Check if element has content
                                 if html and len(html) > 100:
                                     Communicator.show_message(f"Found search results container using selector: {selector}")
                                     print(f"DEBUG: Returning results container (HTML length: {len(html)})")
                                     return element
-                                else:
-                                    print(f"DEBUG: Element too small, trying next selector")
                             except Exception as e:
-                                print(f"DEBUG: Error getting element HTML: {str(e)}")
+                                if attempt % 10 == 0:
+                                    print(f"DEBUG: Error getting element HTML: {str(e)}")
                                 continue
                     except Exception as e:
-                        if attempt % 10 == 0:
-                            print(f"DEBUG: Selector {selector} failed: {str(e)}")
                         continue
                 
-                # If no selector worked, try a more aggressive approach
-                if attempt % 5 == 0:  # Check more frequently
+                # If no selector worked after 10 attempts, try aggressive approach
+                if attempt >= 10 and attempt % 5 == 0:
                     print("DEBUG: No selectors worked, trying to find any results...")
                     try:
-                        # Look for any anchor tags that might be results
                         all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
                         print(f"DEBUG: Found {len(all_links)} place links on page")
                         
-                        # Also check for other result indicators
-                        result_indicators = [
-                            "a[data-value='Search results']",
-                            "div[data-value='Search results']", 
-                            ".hfpxzc",
-                            "a.hfpxzc",
-                            "[role='button'][data-value]"
-                        ]
-                        
-                        total_results = len(all_links)
-                        for indicator in result_indicators:
-                            try:
-                                elements = self.driver.find_elements("css selector", indicator)
-                                total_results += len(elements)
-                                if len(elements) > 0:
-                                    print(f"DEBUG: Found {len(elements)} elements with selector: {indicator}")
-                            except:
-                                continue
-                        
-                        print(f"DEBUG: Total potential results found: {total_results}")
-                        
-                        if total_results > 0:
-                            Communicator.show_message(f"Found {total_results} results by scanning page")
+                        if len(all_links) > 0:
+                            Communicator.show_message(f"Found {len(all_links)} results by scanning page links")
                             print("DEBUG: Will extract links directly from page")
-                            
-                            # Return the body element since we found results
                             body = self.driver.find_element("css selector", "body")
                             return body
-                        else:
-                            print("DEBUG: No results found, checking page content...")
-                            # Get page title and URL for debugging
-                            title = self.driver.title
-                            url = self.driver.current_url
-                            print(f"DEBUG: Page title: {title}")
-                            print(f"DEBUG: Current URL: {url}")
-                            
-                            # Check if we're on the right page
-                            if "Google Maps" in title and ("search" in url or "place" in url):
-                                print("DEBUG: On correct Google Maps page, but no results found")
-                                # Maybe results are loading slowly, continue waiting
-                            else:
-                                print("DEBUG: Not on expected Google Maps page")
-                                
                     except Exception as e:
                         print(f"DEBUG: Direct link search failed: {str(e)}")
                 
-                time.sleep(1)
+                time.sleep(0.5)  # Shorter sleep for faster detection
                 
             except Exception as e:
                 print(f"ERROR in wait loop: {str(e)}")
-                Communicator.show_message(f"Error checking for results: {str(e)}")
-                time.sleep(1)
+                time.sleep(0.5)
         
         print(f"ERROR: Timeout after {timeout}s waiting for search results")
-        Communicator.show_message("Timeout waiting for search results")
+        Communicator.show_message("Timeout waiting for search results - trying last resort")
         
-        # Last resort - return body element and let extraction try to find links
+        # Last resort - check if we collected any results during redirect handling
+        if len(self.all_results_links) > 0:
+            print(f"DEBUG: Timeout but have {len(self.all_results_links)} results from redirect handling")
+            Communicator.show_message(f"Proceeding with {len(self.all_results_links)} result(s) found")
+            return "SINGLE_RESULT"
+        
+        # Try body extraction as final fallback
         try:
             print("DEBUG: Timeout - attempting last resort body extraction")
             body = self.driver.find_element("css selector", "body")
@@ -343,7 +321,7 @@ class ImprovedScroller:
             return []
     
     def scroll(self):
-        """Improved scrolling with better error handling and continuous scrolling"""
+        """Improved scrolling with better error handling"""
         
         Communicator.show_message("DEBUG: Starting scroller.scroll() method")
         print("DEBUG: Starting scroller.scroll() method")
@@ -353,93 +331,24 @@ class ImprovedScroller:
         Communicator.show_message("DEBUG: Initialized all_results_links")
         print("DEBUG: Initialized all_results_links")
         
+        # Check page state immediately (no additional sleep since mainscraping already waited)
+        try:
+            current_url = self.driver.current_url
+            page_title = self.driver.title
+            print(f"DEBUG: Page URL: {current_url}")
+            print(f"DEBUG: Page title: {page_title}")
+            Communicator.show_message(f"Current page: {page_title[:50]}...")
+        except Exception as e:
+            print(f"DEBUG: Could not get page info: {str(e)}")
+        
         # Wait for search results to load
+        Communicator.show_message("Looking for search results...")
         scrollAbleElement = self.wait_for_search_results()
         
         if scrollAbleElement is None:
             Communicator.show_message("ERROR: Could not find search results container")
             print("ERROR: Could not find search results container")
             return
-        
-        # Extract initial results
-        self.extract_results_from_page()
-        
-        # If we have results, continue scrolling to get more
-        if len(self.all_results_links) > 0:
-            Communicator.show_message(f"Found {len(self.all_results_links)} initial results, starting to scroll for more...")
-            print(f"DEBUG: Starting to scroll with {len(self.all_results_links)} initial results")
-            
-            # Start the scrolling process
-            self.perform_scrolling(scrollAbleElement)
-        
-        # Final extraction and parsing
-        if len(self.all_results_links) > 0:
-            Communicator.show_message(f"Scrolling complete. Total results collected: {len(self.all_results_links)}")
-            print(f"DEBUG: Final result count: {len(self.all_results_links)}")
-            self.start_parsing()
-        else:
-            Communicator.show_message("No results found after scrolling")
-            print("DEBUG: No results found")
-    
-    def extract_results_from_page(self):
-        """Extract all results currently visible on the page"""
-        try:
-            # Look for any place links on the page
-            all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
-            if len(all_links) > 0:
-                print(f"DEBUG: Found {len(all_links)} place links on page")
-                # Add all found links to results
-                for link in all_links:
-                    href = link.get_attribute('href')
-                    if href and href not in self.all_results_links:
-                        self.all_results_links.append(href)
-                print(f"DEBUG: Total unique results now: {len(self.all_results_links)}")
-        except Exception as e:
-            print(f"DEBUG: Error extracting results: {str(e)}")
-    
-    def perform_scrolling(self, scrollable_element):
-        """Perform the actual scrolling to load more results"""
-        max_scrolls = 20  # Limit to prevent infinite scrolling
-        scroll_count = 0
-        no_new_results_count = 0
-        
-        while scroll_count < max_scrolls and no_new_results_count < 3:
-            scroll_count += 1
-            previous_count = len(self.all_results_links)
-            
-            try:
-                # Scroll down
-                if scrollable_element and scrollable_element != "CONTINUE_SCROLLING":
-                    self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollTop + 1000", scrollable_element)
-                else:
-                    # Fallback: scroll the page
-                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                
-                # Wait for new content to load
-                time.sleep(2)
-                
-                # Extract new results
-                self.extract_results_from_page()
-                
-                new_count = len(self.all_results_links)
-                if new_count > previous_count:
-                    no_new_results_count = 0  # Reset counter
-                    Communicator.show_message(f"Found {new_count - previous_count} new results (total: {new_count})")
-                    print(f"DEBUG: Scroll {scroll_count}: Found {new_count - previous_count} new results")
-                else:
-                    no_new_results_count += 1
-                    print(f"DEBUG: Scroll {scroll_count}: No new results found ({no_new_results_count}/3)")
-                
-                # Show progress every few scrolls
-                if scroll_count % 3 == 0:
-                    Communicator.show_message(f"Scrolled {scroll_count} times, found {new_count} results so far...")
-                
-            except Exception as e:
-                print(f"DEBUG: Error during scroll {scroll_count}: {str(e)}")
-                break
-        
-        Communicator.show_message(f"Scrolling completed after {scroll_count} attempts")
-        print(f"DEBUG: Scrolling completed. Total scrolls: {scroll_count}, Final results: {len(self.all_results_links)}")
         
         # Check if we already have a single result from redirect handling
         if scrollAbleElement == "SINGLE_RESULT":
