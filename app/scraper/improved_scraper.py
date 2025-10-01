@@ -189,7 +189,16 @@ class ImprovedBackend(Base):
             self.openingurl(url=link_of_page)
             
             Communicator.show_message("Page loaded, starting search...")
-            sleep(3)  # Give more time for the page to load
+            sleep(5)  # Give more time for the page to load
+            
+            # Debug: Save page source for analysis
+            try:
+                with open('/tmp/maps_page.html', 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                print("DEBUG: Page source saved to /tmp/maps_page.html")
+                Communicator.show_message("DEBUG: Page source saved for analysis")
+            except Exception as e:
+                print(f"DEBUG: Could not save page source: {e}")
             
             # Check if we're on the right page
             current_url = self.driver.current_url
