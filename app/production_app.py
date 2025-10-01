@@ -535,22 +535,36 @@ def index():
                     
                     const availableFiles = data.available_files || [];
                     if (availableFiles.length > 0) {
-                        // Show all available files
-                        availableFiles.forEach(file => {
-                            if (file.endsWith('.xlsx')) {
-                                this.downloadExcel.href = `/download/${encodeURIComponent(file)}`;
-                                this.downloadExcel.textContent = `📊 Download ${file}`;
-                                this.downloadExcel.style.display = 'inline-block';
-                            } else if (file.endsWith('.csv')) {
-                                this.downloadCsv.href = `/download/${encodeURIComponent(file)}`;
-                                this.downloadCsv.textContent = `📄 Download ${file}`;
-                                this.downloadCsv.style.display = 'inline-block';
-                            } else if (file.endsWith('.json')) {
-                                this.downloadJson.href = `/download/${encodeURIComponent(file)}`;
-                                this.downloadJson.textContent = `📋 Download ${file}`;
-                                this.downloadJson.style.display = 'inline-block';
-                            }
+                        // Sort files to get the most recent one (highest number or latest)
+                        const sortedFiles = availableFiles.sort((a, b) => {
+                            // Extract numbers from filenames for proper sorting
+                            const aNum = a.match(/\((\d+)\)/);
+                            const bNum = b.match(/\((\d+)\)/);
+                            const aNumValue = aNum ? parseInt(aNum[1]) : 0;
+                            const bNumValue = bNum ? parseInt(bNum[1]) : 0;
+                            return bNumValue - aNumValue; // Sort descending (newest first)
                         });
+                        
+                        // Show the most recent file of each type
+                        const recentXlsx = sortedFiles.find(f => f.endsWith('.xlsx'));
+                        const recentCsv = sortedFiles.find(f => f.endsWith('.csv'));
+                        const recentJson = sortedFiles.find(f => f.endsWith('.json'));
+                        
+                        if (recentXlsx) {
+                            this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
+                            this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
+                            this.downloadExcel.style.display = 'inline-block';
+                        }
+                        if (recentCsv) {
+                            this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
+                            this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
+                            this.downloadCsv.style.display = 'inline-block';
+                        }
+                        if (recentJson) {
+                            this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
+                            this.downloadJson.textContent = `📋 Download ${recentJson}`;
+                            this.downloadJson.style.display = 'inline-block';
+                        }
                     } else if (data.output_file) {
                         this.downloadExcel.href = `/download/${encodeURIComponent(data.output_file)}`;
                         this.downloadExcel.textContent = `📊 Download ${data.output_file}`;
@@ -571,21 +585,36 @@ def index():
                         
                         const files = data.files || [];
                         if (files.length > 0) {
-                            files.forEach(file => {
-                                if (file.endsWith('.xlsx')) {
-                                    this.downloadExcel.href = `/download/${encodeURIComponent(file)}`;
-                                    this.downloadExcel.textContent = `📊 Download ${file}`;
-                                    this.downloadExcel.style.display = 'inline-block';
-                                } else if (file.endsWith('.csv')) {
-                                    this.downloadCsv.href = `/download/${encodeURIComponent(file)}`;
-                                    this.downloadCsv.textContent = `📄 Download ${file}`;
-                                    this.downloadCsv.style.display = 'inline-block';
-                                } else if (file.endsWith('.json')) {
-                                    this.downloadJson.href = `/download/${encodeURIComponent(file)}`;
-                                    this.downloadJson.textContent = `📋 Download ${file}`;
-                                    this.downloadJson.style.display = 'inline-block';
-                                }
+                            // Sort files to get the most recent one (highest number or latest)
+                            const sortedFiles = files.sort((a, b) => {
+                                // Extract numbers from filenames for proper sorting
+                                const aNum = a.match(/\((\d+)\)/);
+                                const bNum = b.match(/\((\d+)\)/);
+                                const aNumValue = aNum ? parseInt(aNum[1]) : 0;
+                                const bNumValue = bNum ? parseInt(bNum[1]) : 0;
+                                return bNumValue - aNumValue; // Sort descending (newest first)
                             });
+                            
+                            // Show the most recent file of each type
+                            const recentXlsx = sortedFiles.find(f => f.endsWith('.xlsx'));
+                            const recentCsv = sortedFiles.find(f => f.endsWith('.csv'));
+                            const recentJson = sortedFiles.find(f => f.endsWith('.json'));
+                            
+                            if (recentXlsx) {
+                                this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
+                                this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
+                                this.downloadExcel.style.display = 'inline-block';
+                            }
+                            if (recentCsv) {
+                                this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
+                                this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
+                                this.downloadCsv.style.display = 'inline-block';
+                            }
+                            if (recentJson) {
+                                this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
+                                this.downloadJson.textContent = `📋 Download ${recentJson}`;
+                                this.downloadJson.style.display = 'inline-block';
+                            }
                         } else {
                             console.log('No files found in /files endpoint');
                             this.downloadExcel.textContent = 'No files available';
