@@ -111,7 +111,9 @@ class ImprovedBackend(Base):
         try:
             # Use WebDriver Manager to automatically handle ChromeDriver version matching
             Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
-            driver_path = ChromeDriverManager().install()
+            
+            # Force WebDriver Manager to get the correct version for Chrome 141
+            driver_path = ChromeDriverManager(version="141.0.6772.85").install()
             Communicator.show_message(f"ChromeDriver path: {driver_path}")
             
             self.driver = uc.Chrome(
@@ -125,11 +127,23 @@ class ImprovedBackend(Base):
             Communicator.show_message("Falling back to manual ChromeDriver...")
             
             try:
+                # Create new options object for fallback
+                fallback_options = uc.ChromeOptions()
+                fallback_options.binary_location = "/opt/google/chrome/chrome"
+                
+                if self.headlessMode == 1:
+                    fallback_options.headless = True
+                
+                # Add essential options for fallback
+                fallback_options.add_argument('--no-sandbox')
+                fallback_options.add_argument('--disable-dev-shm-usage')
+                fallback_options.add_argument('--disable-gpu')
+                
                 if DRIVER_EXECUTABLE_PATH is not None:
                     self.driver = uc.Chrome(
-                        driver_executable_path=DRIVER_EXECUTABLE_PATH, options=options)
+                        driver_executable_path=DRIVER_EXECUTABLE_PATH, options=fallback_options)
                 else:
-                    self.driver = uc.Chrome(options=options)
+                    self.driver = uc.Chrome(options=fallback_options)
                 Communicator.show_message("Chrome driver initialized successfully (fallback)")
             except Exception as e2:
                 Communicator.show_message(f"Chrome driver initialization failed: {str(e2)}")
