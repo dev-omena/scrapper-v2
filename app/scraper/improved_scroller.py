@@ -104,10 +104,21 @@ class ImprovedScroller:
         Communicator.show_message("Waiting for search results to load...")
         
         start_time = time.time()
+        attempt = 0
+        
         while time.time() - start_time < timeout:
+            attempt += 1
+            elapsed = int(time.time() - start_time)
+            
+            if attempt % 5 == 0:
+                print(f"DEBUG: Wait attempt {attempt}, elapsed {elapsed}s")
+                Communicator.show_message(f"Still waiting... ({elapsed}s elapsed)")
+            
             try:
                 # Check if we're still on consent page
                 current_url = self.driver.current_url
+                print(f"DEBUG: Current URL: {current_url[:100]}...")
+                
                 if "consent.google.com" in current_url:
                     Communicator.show_message("ERROR: Still on consent page - cannot access Google Maps")
                     print("ERROR: Still on consent page")
@@ -130,34 +141,76 @@ class ImprovedScroller:
                 selectors = [
                     "[role='feed']",
                     ".m6QErb",
+                    "div.m6QErb",
                     ".section-scrollbox",
-                    "div[role='main']"
+                    "div[role='main']",
+                    "[aria-label*='Results']",
+                    ".section-layout"
                 ]
                 
                 for selector in selectors:
                     try:
                         element = self.driver.find_element("css selector", selector)
                         
-                        if element:
-                            # Verify this is actually a results list, not a single place page
-                            html = element.get_attribute('outerHTML')
+                        if element and element.is_displayed():
+                            print(f"DEBUG: Found element with selector: {selector}")
                             
-                            # Check for indicators of search results vs single place
-                            if 'role="feed"' in html or 'hfpxzc' in html:
-                                Communicator.show_message(f"Found search results using selector: {selector}")
-                                print(f"DEBUG: Found results container with selector: {selector}")
-                                return element
+                            # Get element info
+                            try:
+                                html = element.get_attribute('outerHTML')
+                                html_preview = html[:200] if html else "None"
+                                print(f"DEBUG: Element HTML preview: {html_preview}...")
+                                
+                                # Check if element has content
+                                if html and len(html) > 100:
+                                    Communicator.show_message(f"Found search results container using selector: {selector}")
+                                    print(f"DEBUG: Returning results container (HTML length: {len(html)})")
+                                    return element
+                                else:
+                                    print(f"DEBUG: Element too small, trying next selector")
+                            except Exception as e:
+                                print(f"DEBUG: Error getting element HTML: {str(e)}")
+                                continue
                     except Exception as e:
+                        if attempt % 10 == 0:
+                            print(f"DEBUG: Selector {selector} failed: {str(e)}")
                         continue
+                
+                # If no selector worked, try a more aggressive approach
+                if attempt % 10 == 0:
+                    print("DEBUG: No selectors worked, trying to find any results...")
+                    try:
+                        # Look for any anchor tags that might be results
+                        all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
+                        print(f"DEBUG: Found {len(all_links)} place links on page")
+                        
+                        if len(all_links) > 0:
+                            Communicator.show_message(f"Found {len(all_links)} results by scanning page links")
+                            print("DEBUG: Will extract links directly from page")
+                            
+                            # Return the body element since we found results
+                            body = self.driver.find_element("css selector", "body")
+                            return body
+                    except Exception as e:
+                        print(f"DEBUG: Direct link search failed: {str(e)}")
                 
                 time.sleep(1)
                 
             except Exception as e:
+                print(f"ERROR in wait loop: {str(e)}")
                 Communicator.show_message(f"Error checking for results: {str(e)}")
                 time.sleep(1)
         
+        print(f"ERROR: Timeout after {timeout}s waiting for search results")
         Communicator.show_message("Timeout waiting for search results")
-        return None
+        
+        # Last resort - return body element and let extraction try to find links
+        try:
+            print("DEBUG: Timeout - attempting last resort body extraction")
+            body = self.driver.find_element("css selector", "body")
+            return body
+        except:
+            return None
     
     def extract_links_from_element(self, element):
         """Extract all valid Google Maps place links from an element"""
@@ -166,39 +219,84 @@ class ImprovedScroller:
                 # We already have the single result in all_results_links
                 return []
             
+            print("DEBUG: Starting link extraction...")
             html_content = element.get_attribute('outerHTML')
+            print(f"DEBUG: Got HTML content, length: {len(html_content)}")
+            
             soup = BeautifulSoup(html_content, 'html.parser')
             
-            # Try to find links with the hfpxzc class (Google Maps result links)
+            # Method 1: Try to find links with the hfpxzc class (Google Maps result links)
             result_links = soup.find_all('a', class_='hfpxzc')
+            print(f"DEBUG: Method 1 (hfpxzc class): Found {len(result_links)} links")
             
             valid_links = []
             for link in result_links:
                 href = link.get('href', '')
                 if href and href not in valid_links:
                     valid_links.append(href)
+                    print(f"DEBUG: Added link from hfpxzc: {href[:80]}...")
             
-            # If no hfpxzc links found, try all links
+            # Method 2: If no hfpxzc links found, try data-item-id attribute
             if len(valid_links) == 0:
+                print("DEBUG: Method 2 - trying data-item-id...")
+                data_item_links = soup.find_all('a', attrs={'data-item-id': True})
+                print(f"DEBUG: Found {len(data_item_links)} links with data-item-id")
+                
+                for link in data_item_links:
+                    href = link.get('href', '')
+                    if href and '/maps/place/' in href and href not in valid_links:
+                        valid_links.append(href)
+                        print(f"DEBUG: Added link from data-item-id: {href[:80]}...")
+            
+            # Method 3: If still no links, try all anchor tags with place URLs
+            if len(valid_links) == 0:
+                print("DEBUG: Method 3 - scanning all anchor tags...")
                 all_links = soup.find_all('a', href=True)
+                print(f"DEBUG: Found {len(all_links)} total anchor tags")
                 
                 for link in all_links:
                     href = link.get('href', '')
                     
                     # Filter for valid Google Maps place links
-                    if '/maps/place/' in href or 'place/' in href:
+                    if '/maps/place/' in href:
                         # Clean up the link if needed
                         if href.startswith('http'):
                             if href not in valid_links:
                                 valid_links.append(href)
+                                print(f"DEBUG: Added place link: {href[:80]}...")
                         elif href.startswith('/'):
                             full_url = f"https://www.google.com{href}"
                             if full_url not in valid_links:
                                 valid_links.append(full_url)
+                                print(f"DEBUG: Added relative link: {full_url[:80]}...")
             
-            print(f"DEBUG: Extracted {len(valid_links)} valid links from element")
+            # Method 4: Last resort - use Selenium to find elements directly
+            if len(valid_links) == 0:
+                print("DEBUG: Method 4 - using Selenium to find links...")
+                try:
+                    from selenium.webdriver.common.by import By
+                    
+                    # Try to find place links directly with Selenium
+                    place_links = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/maps/place/']")
+                    print(f"DEBUG: Selenium found {len(place_links)} place links")
+                    
+                    for link_elem in place_links:
+                        try:
+                            href = link_elem.get_attribute('href')
+                            if href and href not in valid_links:
+                                valid_links.append(href)
+                                print(f"DEBUG: Added Selenium link: {href[:80]}...")
+                        except:
+                            continue
+                except Exception as e:
+                    print(f"DEBUG: Selenium method failed: {str(e)}")
+            
+            print(f"DEBUG: Total extracted {len(valid_links)} valid links")
             if len(valid_links) > 0:
-                print(f"DEBUG: First link sample: {valid_links[0][:100]}")
+                print(f"DEBUG: First link: {valid_links[0][:100]}")
+                Communicator.show_message(f"Extracted {len(valid_links)} business links")
+            else:
+                Communicator.show_message("Warning: No links extracted from current view")
             
             return valid_links
             
