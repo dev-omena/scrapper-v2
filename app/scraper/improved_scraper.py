@@ -112,8 +112,8 @@ class ImprovedBackend(Base):
             # Use WebDriver Manager to automatically handle ChromeDriver version matching
             Communicator.show_message("Downloading/updating ChromeDriver for current Chrome version...")
             
-            # Force WebDriver Manager to get the correct version for Chrome 141
-            driver_path = ChromeDriverManager(driver_version="141.0.6772.85").install()
+            # Let WebDriver Manager auto-detect the correct version for Chrome 141
+            driver_path = ChromeDriverManager().install()
             Communicator.show_message(f"ChromeDriver path: {driver_path}")
             
             self.driver = uc.Chrome(
@@ -192,6 +192,51 @@ class ImprovedBackend(Base):
             # Check for any error messages or redirects
             page_title = self.driver.title
             Communicator.show_message(f"Page title: {page_title}")
+            
+            # Check if we're on a specific place page instead of search results
+            if "/maps/place/" in current_url:
+                Communicator.show_message("Detected specific place page, trying to get back to search results...")
+                print("DEBUG: Detected specific place page, trying to get back to search results")
+                
+                try:
+                    # Try to find and click "Back" or "Search results" button
+                    back_selectors = [
+                        "button[aria-label*='Back']",
+                        "button[aria-label*='Close']", 
+                        "button[jsaction*='back']",
+                        "[data-value='Search results']",
+                        "button.gm2-button-icon"
+                    ]
+                    
+                    for selector in back_selectors:
+                        try:
+                            back_btn = self.driver.find_element("css selector", selector)
+                            if back_btn and back_btn.is_displayed():
+                                print(f"DEBUG: Found back button with selector: {selector}")
+                                back_btn.click()
+                                time.sleep(2)
+                                break
+                        except:
+                            continue
+                    
+                    # If no back button found, try browser back
+                    if "/maps/place/" in self.driver.current_url:
+                        print("DEBUG: Using browser back")
+                        self.driver.back()
+                        time.sleep(2)
+                    
+                    # Check if we're back to search results
+                    current_url = self.driver.current_url
+                    if "/maps/search/" in current_url:
+                        Communicator.show_message("Successfully returned to search results")
+                        print("DEBUG: Successfully returned to search results")
+                    else:
+                        Communicator.show_message("Could not return to search results, will try alternative approach")
+                        print("DEBUG: Could not return to search results")
+                        
+                except Exception as e:
+                    Communicator.show_message(f"Error handling place page redirect: {str(e)}")
+                    print(f"DEBUG: Error handling place page redirect: {str(e)}")
             
             # Handle Google consent page - ALTERNATIVE SEARCH APPROACH
             if "consent.google.com" in current_url or "Voordat je verdergaat" in page_title:
