@@ -177,20 +177,56 @@ class ImprovedScroller:
                         continue
                 
                 # If no selector worked, try a more aggressive approach
-                if attempt % 10 == 0:
+                if attempt % 5 == 0:  # Check more frequently
                     print("DEBUG: No selectors worked, trying to find any results...")
                     try:
                         # Look for any anchor tags that might be results
                         all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
                         print(f"DEBUG: Found {len(all_links)} place links on page")
                         
-                        if len(all_links) > 0:
-                            Communicator.show_message(f"Found {len(all_links)} results by scanning page links")
+                        # Also check for other result indicators
+                        result_indicators = [
+                            "a[data-value='Search results']",
+                            "div[data-value='Search results']", 
+                            ".hfpxzc",
+                            "a.hfpxzc",
+                            "[role='button'][data-value]"
+                        ]
+                        
+                        total_results = len(all_links)
+                        for indicator in result_indicators:
+                            try:
+                                elements = self.driver.find_elements("css selector", indicator)
+                                total_results += len(elements)
+                                if len(elements) > 0:
+                                    print(f"DEBUG: Found {len(elements)} elements with selector: {indicator}")
+                            except:
+                                continue
+                        
+                        print(f"DEBUG: Total potential results found: {total_results}")
+                        
+                        if total_results > 0:
+                            Communicator.show_message(f"Found {total_results} results by scanning page")
                             print("DEBUG: Will extract links directly from page")
                             
                             # Return the body element since we found results
                             body = self.driver.find_element("css selector", "body")
                             return body
+                        else:
+                            print("DEBUG: No results found, checking page content...")
+                            # Get page title and URL for debugging
+                            title = self.driver.title
+                            url = self.driver.current_url
+                            print(f"DEBUG: Page title: {title}")
+                            print(f"DEBUG: Current URL: {url}")
+                            
+                            # Check if we're on the right page
+                            if "Google Maps" in title and ("search" in url or "place" in url):
+                                print("DEBUG: On correct Google Maps page, but no results found")
+                                # Maybe results are loading slowly, continue waiting
+                            else:
+                                print("DEBUG: Not on expected Google Maps page")
+                                
                     except Exception as e:
                         print(f"DEBUG: Direct link search failed: {str(e)}")
                 
@@ -323,7 +359,29 @@ class ImprovedScroller:
         if scrollAbleElement is None:
             Communicator.show_message("ERROR: Could not find search results container")
             print("ERROR: Could not find search results container")
-            return
+        
+        # Try to proceed anyway - maybe we can extract results directly
+        print("DEBUG: Attempting to extract results directly from page...")
+        try:
+            # Look for any place links on the page
+            all_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
+            if len(all_links) > 0:
+                print(f"DEBUG: Found {len(all_links)} place links, proceeding with extraction")
+                Communicator.show_message(f"Found {len(all_links)} results directly from page")
+                # Add all found links to results
+                for link in all_links:
+                    href = link.get_attribute('href')
+                    if href and href not in self.all_results_links:
+                        self.all_results_links.append(href)
+                
+                if len(self.all_results_links) > 0:
+                    print(f"DEBUG: Starting parsing with {len(self.all_results_links)} results")
+                    self.start_parsing()
+                    return
+        except Exception as e:
+            print(f"DEBUG: Direct extraction failed: {str(e)}")
+        
+        return
         
         # Check if we already have a single result from redirect handling
         if scrollAbleElement == "SINGLE_RESULT":
