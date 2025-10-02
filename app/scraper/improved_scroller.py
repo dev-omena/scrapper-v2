@@ -321,15 +321,16 @@ class ImprovedScroller:
             return []
     
     def scroll(self):
-        """Improved scrolling with better error handling"""
+        """Improved scrolling with better error handling and performance"""
         
-        Communicator.show_message("DEBUG: Starting scroller.scroll() method")
-        print("DEBUG: Starting scroller.scroll() method")
+        Communicator.show_message("DEBUG: Starting enhanced scroller.scroll() method")
+        print("DEBUG: Starting enhanced scroller.scroll() method")
         
         # Make sure all_results_links is initialized
         self.all_results_links = []
-        Communicator.show_message("DEBUG: Initialized all_results_links")
-        print("DEBUG: Initialized all_results_links")
+        self.unique_links = set()  # Track unique links to avoid duplicates
+        Communicator.show_message("DEBUG: Initialized all_results_links and unique_links tracker")
+        print("DEBUG: Initialized all_results_links and unique_links tracker")
         
         # Check page state immediately (no additional sleep since mainscraping already waited)
         try:
@@ -370,9 +371,12 @@ class ImprovedScroller:
         
         # Extract initial links
         initial_links = self.extract_links_from_element(scrollAbleElement)
-        self.all_results_links.extend(initial_links)
-        print(f"DEBUG: Initial extraction found {len(initial_links)} links")
-        Communicator.show_message(f"DEBUG: Initial extraction found {len(initial_links)} links")
+        for link in initial_links:
+            if link not in self.unique_links:
+                self.unique_links.add(link)
+                self.all_results_links.append(link)
+        print(f"DEBUG: Initial extraction found {len(initial_links)} links, {len(self.all_results_links)} unique")
+        Communicator.show_message(f"DEBUG: Initial extraction found {len(self.all_results_links)} unique links")
         
         if len(initial_links) == 0:
             # Try alternative extraction method
@@ -386,7 +390,8 @@ class ImprovedScroller:
                     try:
                         href = anchor.get_attribute('href')
                         if href and '/maps/place/' in href:
-                            if href not in self.all_results_links:
+                            if href not in self.unique_links:
+                                self.unique_links.add(href)
                                 self.all_results_links.append(href)
                     except:
                         continue
@@ -444,10 +449,11 @@ class ImprovedScroller:
                 # Extract new links
                 new_links = self.extract_links_from_element(scrollAbleElement)
                 
-                # Add only unique links
+                # Add only unique links using set for faster lookup
                 added_count = 0
                 for link in new_links:
-                    if link not in self.all_results_links:
+                    if link not in self.unique_links:
+                        self.unique_links.add(link)
                         self.all_results_links.append(link)
                         added_count += 1
                 

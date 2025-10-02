@@ -50,7 +50,24 @@ class ProductionCommunicator:
         return getattr(self, 'search_query', 'unknown')
 
 # Global communicator instance
-production_comm = ProductionCommunicator()
+# Session-based communicators for production (thread-safe)
+import threading
+session_communicators = {}
+session_lock = threading.Lock()
+
+# Helper functions for session management
+def get_session_communicator(session_id):
+    """Get or create a communicator for a specific session"""
+    with session_lock:
+        if session_id not in session_communicators:
+            session_communicators[session_id] = ProductionCommunicator()
+        return session_communicators[session_id]
+
+def cleanup_session(session_id):
+    """Clean up resources for a completed session"""
+    with session_lock:
+        if session_id in session_communicators:
+            del session_communicators[session_id]
 
 @app.route('/')
 def index():
@@ -446,6 +463,8 @@ def index():
 
                         if (result.status === 'started') {
                             this.statusText.textContent = 'Scraping in progress...';
+                            this.currentJobId = result.job_id; // Store job ID for session tracking
+                            console.log('Started scraping job:', this.currentJobId);
                             this.pollStatus();
                         } else {
                             this.statusText.textContent = 'Error starting scraping';
@@ -464,7 +483,10 @@ def index():
                 async pollStatus() {
                     const pollInterval = setInterval(async () => {
                         try {
-                            const response = await fetch('/status');
+                            // Use session-specific status endpoint if we have a job ID
+                            const statusUrl = this.currentJobId ? `/status/${this.currentJobId}` : '/status';
+                            console.log('Polling status for:', statusUrl);
+                            const response = await fetch(statusUrl);
                             const data = await response.json();
                             
                             this.statusText.textContent = data.status;
@@ -646,32 +668,36 @@ def scrape():
         if not search_query:
             return jsonify({"status": "error", "message": "Search query is required"}), 400
         
-        # Generate unique job ID
+        # Generate unique job ID (this will be our session ID)
         job_id = str(uuid.uuid4())[:8]
         
-        # Reset communicator
-        production_comm.messages = []
-        production_comm.status = "running"
-        production_comm.job_id = job_id
-        production_comm.search_query = search_query
-        production_comm.output_format = output_format
-        production_comm.scraped_data = []
-        production_comm.output_file = None
+        # Get session-specific communicator
+        session_comm = get_session_communicator(job_id)
+        
+        # Reset session communicator
+        session_comm.messages = []
+        session_comm.status = "running"
+        session_comm.job_id = job_id
+        session_comm.search_query = search_query
+        session_comm.output_format = output_format
+        session_comm.scraped_data = []
+        session_comm.output_file = None
         
         # Start scraping in background thread
         def run_scraper():
             try:
-                production_comm.show_message(f"Starting scraping job {job_id}")
-                production_comm.show_message(f"Search query: {search_query}")
-                production_comm.show_message("Initializing Chrome in headless mode...")
-                production_comm.show_message("Note: Arabic and international searches are supported")
+                session_comm.show_message(f"Starting scraping job {job_id}")
+                session_comm.show_message(f"Search query: {search_query}")
+                session_comm.show_message("Initializing Chrome in headless mode...")
+                session_comm.show_message("Note: Arabic and international searches are supported")
                 
                 # Set up communicator for Production environment FIRST
                 # Create a mock frontend object for the communicator
-                class ProductionFrontend:
+                class SessionFrontend:
                     def __init__(self, comm):
                         self.comm = comm
                         self.outputFormatValue = output_format
+                        self.session_id = job_id  # Track session ID
                     
                     def messageshowing(self, message):
                         self.comm.show_message(message)
@@ -679,9 +705,9 @@ def scrape():
                     def end_processing(self):
                         self.comm.end_processing()
                 
-                # Create mock frontend and set it in communicator
-                production_frontend = ProductionFrontend(production_comm)
-                Communicator.set_frontend_object(production_frontend)
+                # Create session-specific frontend and set it in communicator
+                session_frontend = SessionFrontend(session_comm)
+                Communicator.set_frontend_object(session_frontend)
                 
                 # Create mock backend object for communicator
                 class ProductionBackend:
@@ -695,12 +721,12 @@ def scrape():
                 backend = Backend(search_query, output_format, healdessmode=healdessmode)
                 
                 # Run scraping
-                production_comm.show_message("Starting scraping process...")
+                session_comm.show_message("Starting scraping process...")
                 backend.mainscraping()
                 
                 # The scraping process will handle data saving automatically
                 # through the existing DataSaver in the scraper
-                production_comm.show_message("Data saving completed automatically")
+                session_comm.show_message("Data saving completed automatically")
                 
                 # Check what files were actually created in multiple possible locations
                 possible_output_dirs = ['output', '../output', '/root/scrapper-v2/output', '/root/scrapper-v2/app/output']
@@ -711,9 +737,9 @@ def scrape():
                         try:
                             files = [f for f in os.listdir(output_dir) if f.endswith(('.xlsx', '.csv', '.json'))]
                             created_files.extend(files)
-                            production_comm.show_message(f"Found {len(files)} files in {output_dir}")
+                            session_comm.show_message(f"Found {len(files)} files in {output_dir}")
                         except Exception as e:
-                            production_comm.show_message(f"Error reading {output_dir}: {e}")
+                            session_comm.show_message(f"Error reading {output_dir}: {e}")
                 
                 if created_files:
                     # Remove duplicates
@@ -731,21 +757,37 @@ def scrape():
                                     latest_file = file
                     
                     if latest_file:
-                        production_comm.output_file = latest_file
-                        production_comm.show_message(f"Output file created: {latest_file}")
-                        production_comm.show_message(f"All available files: {', '.join(created_files)}")
+                        session_comm.output_file = latest_file
+                        session_comm.show_message(f"Output file created: {latest_file}")
+                        session_comm.show_message(f"All available files: {', '.join(created_files)}")
                 else:
-                    production_comm.show_message("No output files found in any output directory")
-                    production_comm.show_message(f"Checked directories: {', '.join(possible_output_dirs)}")
+                    session_comm.show_message("No output files found in any output directory")
+                    session_comm.show_message(f"Checked directories: {', '.join(possible_output_dirs)}")
                 
-                production_comm.status = "completed"
-                production_comm.show_message(f"Job {job_id} completed successfully!")
-                production_comm.show_message("Check the output folder for your scraped data")
+                session_comm.status = "completed"
+                session_comm.show_message(f"Job {job_id} completed successfully!")
+                session_comm.show_message("Check the output folder for your scraped data")
+                
+                # Clean up session after a delay (keep it for status checking)
+                def delayed_cleanup():
+                    import time
+                    time.sleep(300)  # Keep session for 5 minutes for status checking
+                    cleanup_session(job_id)
+                
+                threading.Thread(target=delayed_cleanup, daemon=True).start()
                 
             except Exception as e:
-                production_comm.status = "error"
-                production_comm.show_error_message(f"Job {job_id} failed: {str(e)}", "PRODUCTION_ERROR")
-                print(f"Scraping error: {str(e)}")
+                session_comm.status = "error"
+                session_comm.show_error_message(f"Job {job_id} failed: {str(e)}", "PRODUCTION_ERROR")
+                print(f"Scraping error for session {job_id}: {str(e)}")
+                
+                # Clean up failed session after a delay
+                def delayed_cleanup():
+                    import time
+                    time.sleep(60)  # Keep failed session for 1 minute
+                    cleanup_session(job_id)
+                
+                threading.Thread(target=delayed_cleanup, daemon=True).start()
         
         thread = threading.Thread(target=run_scraper)
         thread.daemon = True
@@ -761,8 +803,9 @@ def scrape():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/status')
-def status():
-    """Get current scraping status"""
+@app.route('/status/<job_id>')
+def status(job_id=None):
+    """Get current scraping status for a specific session"""
     # Check for output files in multiple possible output directories (prioritize main output dir)
     all_files_with_time = []
     possible_output_dirs = ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']
@@ -796,14 +839,53 @@ def status():
     
     print(f"DEBUG: Status endpoint - Final sorted files (most recent first): {output_files}")
     
-    return jsonify({
-        "status": production_comm.status,
-        "messages": production_comm.messages[-50:],  # Last 50 messages to show more debug info
-        "job_id": production_comm.job_id,
-        "output_file": production_comm.output_file,
-        "available_files": output_files,
-        "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
-    })
+    # If job_id is provided, get session-specific status
+    if job_id:
+        with session_lock:
+            if job_id in session_communicators:
+                session_comm = session_communicators[job_id]
+                return jsonify({
+                    "status": session_comm.status,
+                    "messages": session_comm.messages[-50:],  # Last 50 messages to show more debug info
+                    "job_id": session_comm.job_id,
+                    "search_query": session_comm.get_search_query(),
+                    "output_file": session_comm.output_file,
+                    "available_files": output_files,
+                    "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
+                })
+            else:
+                return jsonify({
+                    "status": "not_found",
+                    "message": f"Session {job_id} not found or expired",
+                    "available_files": output_files,
+                    "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
+                })
+    
+    # If no job_id provided, return general status (for backward compatibility)
+    # Try to find the most recent active session
+    with session_lock:
+        if session_communicators:
+            # Get the most recent session
+            latest_session = max(session_communicators.values(), key=lambda x: getattr(x, 'job_id', ''))
+            return jsonify({
+                "status": latest_session.status,
+                "messages": latest_session.messages[-50:],
+                "job_id": latest_session.job_id,
+                "search_query": latest_session.get_search_query(),
+                "output_file": latest_session.output_file,
+                "available_files": output_files,
+                "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
+            })
+        else:
+            return jsonify({
+                "status": "idle",
+                "messages": [],
+                "job_id": None,
+                "search_query": None,
+                "output_file": None,
+                "available_files": output_files,
+                "checked_directories": [d for d in possible_output_dirs if os.path.exists(d)]
+            })
 
 @app.route('/files')
 def list_files():
