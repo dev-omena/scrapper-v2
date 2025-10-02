@@ -405,10 +405,8 @@ class ImprovedScroller:
         
         last_height = 0
         scroll_attempts = 0
-        max_scroll_attempts = 100  # Increased from 50 to 100
+        max_scroll_attempts = 50
         no_new_results_count = 0
-        consecutive_same_height = 0
-        min_results_before_stopping = 15  # Don't stop until we have at least 15 results
         
         while scroll_attempts < max_scroll_attempts:
             if Common.close_thread_is_set():
@@ -436,74 +434,20 @@ class ImprovedScroller:
                 # Get current count
                 current_count = len(self.all_results_links)
                 
-                # More aggressive scrolling - scroll multiple times and wait longer
-                current_scroll_height = self.driver.execute_script(
-                    "return arguments[0].scrollHeight", scrollAbleElement
+                # Scroll down
+                self.driver.execute_script(
+                    "arguments[0].scrollTo(0, arguments[0].scrollHeight);",
+                    scrollAbleElement,
                 )
-                
-                print(f"DEBUG: Current scroll height: {current_scroll_height}")
-                
-                # If we've been getting the same results, try more aggressive scrolling
-                if no_new_results_count > 2 and len(self.all_results_links) < 10:
-                    print("DEBUG: Using extra aggressive scrolling due to stuck results")
-                    
-                    # Try scrolling with different strategies
-                    strategies = [
-                        "arguments[0].scrollBy(0, 500);",  # Scroll by pixels
-                        "arguments[0].scrollTo(0, arguments[0].scrollTop + arguments[0].clientHeight);",  # Scroll by viewport height
-                        "arguments[0].scrollTo(0, arguments[0].scrollHeight * 0.7);",  # Scroll to 70%
-                        "arguments[0].scrollTo(0, arguments[0].scrollHeight * 0.9);",  # Scroll to 90%
-                        "arguments[0].scrollTo(0, arguments[0].scrollHeight);",  # Scroll to bottom
-                    ]
-                    
-                    for i, strategy in enumerate(strategies):
-                        try:
-                            self.driver.execute_script(strategy, scrollAbleElement)
-                            time.sleep(1.5)  # Wait between each strategy
-                            print(f"DEBUG: Applied scrolling strategy {i+1}")
-                        except:
-                            continue
-                    
-                    # Extra wait for lazy loading
-                    time.sleep(5)
-                    
-                else:
-                    # Normal scrolling strategy
-                    # Scroll down in increments to trigger loading
-                    for i in range(3):  # Scroll 3 times in small increments
-                        self.driver.execute_script(
-                            f"arguments[0].scrollTo(0, arguments[0].scrollHeight * {0.8 + (i * 0.1)});",
-                            scrollAbleElement,
-                        )
-                        time.sleep(1)  # Wait between scrolls
-                    
-                    # Final scroll to bottom
-                    self.driver.execute_script(
-                        "arguments[0].scrollTo(0, arguments[0].scrollHeight);",
-                        scrollAbleElement,
-                    )
-                    
-                    # Wait longer for results to load, especially if we have few results
-                    if len(self.all_results_links) < min_results_before_stopping:
-                        time.sleep(4)  # Wait longer when we have few results
-                    else:
-                        time.sleep(2)
+                time.sleep(2)
                 
                 # Get new scroll height
                 new_height = self.driver.execute_script(
                     "return arguments[0].scrollHeight", scrollAbleElement
                 )
                 
-                # Extract new links with enhanced debugging
-                print(f"DEBUG: Extracting links after scroll attempt {scroll_attempts}")
+                # Extract new links
                 new_links = self.extract_links_from_element(scrollAbleElement)
-                print(f"DEBUG: Extraction returned {len(new_links)} links")
-                
-                # Debug: Check if we're getting the same links
-                if len(new_links) > 0:
-                    print(f"DEBUG: First extracted link: {new_links[0][:100]}")
-                    if len(new_links) > 1:
-                        print(f"DEBUG: Last extracted link: {new_links[-1][:100]}")
                 
                 # Add only unique links using set for faster lookup
                 added_count = 0
@@ -512,47 +456,9 @@ class ImprovedScroller:
                         self.unique_links.add(link)
                         self.all_results_links.append(link)
                         added_count += 1
-                        print(f"DEBUG: Added new unique link: {link[:80]}...")
                 
-                print(f"DEBUG: Added {added_count} new links. Total unique: {len(self.all_results_links)}")
-                print(f"DEBUG: Current unique_links set size: {len(self.unique_links)}")
+                print(f"DEBUG: Added {added_count} new links. Total: {len(self.all_results_links)}")
                 Communicator.show_message(f"Found {len(self.all_results_links)} results so far...")
-                
-                # If we're not finding new results, try alternative extraction methods
-                if added_count == 0 and len(self.all_results_links) < 10:
-                    print("DEBUG: No new results found, trying alternative extraction...")
-                    
-                    # Try extracting from the entire page instead of just the scrollable element
-                    try:
-                        all_page_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
-                        print(f"DEBUG: Found {len(all_page_links)} total page links")
-                        
-                        alternative_added = 0
-                        for link_elem in all_page_links:
-                            try:
-                                href = link_elem.get_attribute('href')
-                                if href and href not in self.unique_links:
-                                    self.unique_links.add(href)
-                                    self.all_results_links.append(href)
-                                    alternative_added += 1
-                                    print(f"DEBUG: Alternative method added: {href[:80]}...")
-                            except:
-                                continue
-                        
-                        if alternative_added > 0:
-                            added_count = alternative_added
-                            print(f"DEBUG: Alternative extraction added {alternative_added} new links")
-                            Communicator.show_message(f"Alternative extraction found {alternative_added} additional results")
-                        
-                    except Exception as e:
-                        print(f"DEBUG: Alternative extraction failed: {str(e)}")
-                
-                # Track scroll height changes
-                if new_height == last_height:
-                    consecutive_same_height += 1
-                else:
-                    consecutive_same_height = 0
-                    last_height = new_height
                 
                 # Check if we added new results
                 if added_count == 0:
@@ -560,35 +466,16 @@ class ImprovedScroller:
                 else:
                     no_new_results_count = 0
                 
-                # More conservative stopping conditions
-                should_stop = False
-                
-                # Only consider stopping if we have some results
-                if len(self.all_results_links) >= min_results_before_stopping:
-                    # Stop if no new results for 5 consecutive scrolls AND scroll height hasn't changed
-                    if no_new_results_count >= 5 and consecutive_same_height >= 3:
-                        should_stop = True
-                        Communicator.show_message("No new results and scroll height unchanged - likely at end")
-                        print("DEBUG: No new results for 5 scrolls and height unchanged")
-                elif len(self.all_results_links) < 5:
-                    # If we have very few results, be more aggressive about continuing
-                    should_stop = False
-                    if no_new_results_count >= 10:  # Only stop after 10 attempts if we have <5 results
-                        should_stop = True
-                        Communicator.show_message("Still very few results after many attempts")
-                else:
-                    # If we have 5-14 results, continue more aggressively
-                    if no_new_results_count >= 8:
-                        should_stop = True
-                        Communicator.show_message("Moderate results found, stopping after 8 no-result scrolls")
-                
-                if should_stop:
-                    # Double-check for end markers
+                # If no new results for 3 consecutive scrolls, check if we're at the end
+                if no_new_results_count >= 3:
+                    Communicator.show_message("No new results found, checking if at end...")
+                    print("DEBUG: No new results for 3 scrolls")
+                    
+                    # Check for end marker
                     try:
                         end_markers = [
                             "You've reached the end",
-                            "reached the end", 
-                            "No more results",
+                            "reached the end",
                             ".PbZDve"
                         ]
                         
@@ -600,23 +487,9 @@ class ImprovedScroller:
                     except:
                         pass
                     
-                    # Final check - try one more extraction method before stopping
-                    print("DEBUG: Trying final extraction before stopping...")
-                    try:
-                        # Try clicking "Show more results" or similar buttons
-                        show_more_buttons = self.driver.find_elements("css selector", 
-                            "[data-value='Show more results'], .VfPpkd-LgbsSe[aria-label*='more'], button[aria-label*='more results']")
-                        
-                        if show_more_buttons:
-                            print("DEBUG: Found 'Show more' button, clicking...")
-                            show_more_buttons[0].click()
-                            time.sleep(3)
-                            no_new_results_count = 0  # Reset counter after clicking
-                            continue
-                    except:
-                        pass
-                    
-                    break
+                    # If we have results, break
+                    if len(self.all_results_links) > 0:
+                        break
                 
                 scroll_attempts += 1
                 
@@ -630,110 +503,21 @@ class ImprovedScroller:
         
         Communicator.show_message("Scrolling completed")
         print(f"DEBUG: Scrolling completed. Total results: {len(self.all_results_links)}")
-        
-        # Final comprehensive extraction attempt if we have very few results
-        if len(self.all_results_links) < 10:
-            Communicator.show_message("Few results found, trying comprehensive final extraction...")
-            print("DEBUG: Attempting comprehensive final extraction")
-            
-            # If we have very few results, suggest broader search terms
-            if len(self.all_results_links) <= 5:
-                Communicator.show_message("⚠️  VERY FEW RESULTS FOUND!")
-                Communicator.show_message("This might be because:")
-                Communicator.show_message("1. The search term is too specific")
-                Communicator.show_message("2. There are genuinely few businesses in this area")
-                Communicator.show_message("3. Google Maps is limiting results")
-                Communicator.show_message("💡 Try broader search terms like:")
-                
-                # Extract the original search query and suggest alternatives
-                try:
-                    from scraper.communicator import Communicator
-                    backend = Communicator.get_backend_object()
-                    if hasattr(backend, 'searchquery'):
-                        original_query = backend.searchquery
-                        
-                        # Suggest broader alternatives
-                        if 'الرياض' in original_query:
-                            Communicator.show_message(f"   • Try: '{original_query.replace('الرياض', 'السعودية')}'")
-                            Communicator.show_message(f"   • Try: '{original_query.split()[0]} {original_query.split()[1]}'")
-                        elif 'في' in original_query:
-                            parts = original_query.split('في')
-                            if len(parts) > 1:
-                                Communicator.show_message(f"   • Try: '{parts[0].strip()}'")
-                        
-                        Communicator.show_message("   • Try removing location-specific terms")
-                        Communicator.show_message("   • Try more general category terms")
-                        
-                except Exception as e:
-                    print(f"DEBUG: Could not generate suggestions: {str(e)}")
-            
-            try:
-                # Try multiple selectors for links
-                comprehensive_selectors = [
-                    "a[href*='/maps/place/']",
-                    "[data-cid] a",
-                    ".hfpxzc",
-                    "[jsaction*='click'] a[href*='maps']",
-                    ".section-result a",
-                    "[role='article'] a"
-                ]
-                
-                for selector in comprehensive_selectors:
-                    try:
-                        elements = self.driver.find_elements("css selector", selector)
-                        print(f"DEBUG: Selector '{selector}' found {len(elements)} elements")
-                        
-                        for element in elements:
-                            try:
-                                href = element.get_attribute('href')
-                                if href and '/maps/place/' in href and href not in self.unique_links:
-                                    self.unique_links.add(href)
-                                    self.all_results_links.append(href)
-                            except:
-                                continue
-                                
-                    except Exception as e:
-                        print(f"DEBUG: Selector '{selector}' failed: {str(e)}")
-                        continue
-                
-                print(f"DEBUG: After comprehensive extraction: {len(self.all_results_links)} total results")
-                Communicator.show_message(f"Final extraction completed: {len(self.all_results_links)} total results")
-                
-            except Exception as e:
-                print(f"DEBUG: Comprehensive extraction failed: {str(e)}")
-        
         Communicator.show_message(f"DEBUG: Total results collected: {len(self.all_results_links)}")
         
         # Print first few links for debugging
         if len(self.all_results_links) > 0:
             print(f"DEBUG: First 3 links: {self.all_results_links[:3]}")
             Communicator.show_message(f"DEBUG: Sample links collected successfully")
-        else:
-            print("DEBUG: No links collected - this might indicate a page structure change")
-            Communicator.show_message("WARNING: No results found - page structure may have changed")
         
         # Start parsing
         print(f"DEBUG: Checking if we have results to parse")
         print(f"DEBUG: all_results_links count: {len(self.all_results_links)}")
         
         if len(self.all_results_links) > 0:
-            # Provide summary based on result count
-            if len(self.all_results_links) <= 5:
-                Communicator.show_message(f"⚠️  Found only {len(self.all_results_links)} results")
-                Communicator.show_message("This is a small number - consider trying broader search terms")
-            elif len(self.all_results_links) <= 15:
-                Communicator.show_message(f"✅ Found {len(self.all_results_links)} results (moderate)")
-            else:
-                Communicator.show_message(f"🎉 Found {len(self.all_results_links)} results (good coverage)")
-            
+            Communicator.show_message(f"Total results found: {len(self.all_results_links)}")
             print(f"DEBUG: Starting parsing with {len(self.all_results_links)} links")
             self.start_parsing()
         else:
-            Communicator.show_message("❌ ERROR: No results found to parse")
-            Communicator.show_message("This could indicate:")
-            Communicator.show_message("1. No businesses found for this search")
-            Communicator.show_message("2. Google Maps page structure changed")
-            Communicator.show_message("3. Search query too specific")
-            Communicator.show_message("4. Geographic location has limited results")
-            Communicator.show_message("💡 Try: More general search terms or different location")
+            Communicator.show_message("No results to parse - no links were collected")
             print("ERROR: No results to parse - all_results_links is empty")
