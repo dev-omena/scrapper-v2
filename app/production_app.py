@@ -216,6 +216,116 @@ def index():
                 box-shadow: none;
             }
 
+            /* Tab Styles */
+            .tabs {
+                display: flex;
+                justify-content: center;
+                margin-bottom: 30px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 15px;
+                padding: 5px;
+                backdrop-filter: blur(10px);
+            }
+
+            .tab {
+                flex: 1;
+                padding: 15px 20px;
+                text-align: center;
+                cursor: pointer;
+                border-radius: 10px;
+                transition: all 0.3s ease;
+                color: #ccc;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .tab:hover {
+                background: rgba(248, 200, 0, 0.1);
+                color: #f8c800;
+            }
+
+            .tab.active {
+                background: linear-gradient(45deg, #f8c800, #ffd700);
+                color: #272860;
+                box-shadow: 0 4px 15px rgba(248, 200, 0, 0.3);
+            }
+
+            .tab-content {
+                display: none;
+            }
+
+            .tab-content.active {
+                display: block;
+            }
+
+            /* History Styles */
+            .history-list {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid rgba(248, 200, 0, 0.2);
+                border-radius: 10px;
+                padding: 15px;
+            }
+
+            .history-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                margin-bottom: 10px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 10px;
+                border-left: 4px solid #f8c800;
+                transition: all 0.3s ease;
+            }
+
+            .history-item:hover {
+                background: rgba(248, 200, 0, 0.1);
+                transform: translateX(5px);
+            }
+
+            .history-item:last-child {
+                margin-bottom: 0;
+            }
+
+            .history-info {
+                flex: 1;
+            }
+
+            .history-filename {
+                color: #f8c800;
+                font-weight: 600;
+                margin-bottom: 5px;
+                word-break: break-word;
+            }
+
+            .history-details {
+                color: #ccc;
+                font-size: 0.9rem;
+                display: flex;
+                gap: 15px;
+                flex-wrap: wrap;
+            }
+
+            .history-download {
+                padding: 8px 16px;
+                background: linear-gradient(45deg, #f8c800, #ffd700);
+                color: #272860;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                white-space: nowrap;
+            }
+
+            .history-download:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(248, 200, 0, 0.4);
+            }
+
             .progress-section {
                 display: none;
                 margin-top: 30px;
@@ -351,8 +461,22 @@ def index():
                 <p class="subtitle">Extract business data and emails with ease</p>
             </div>
 
-            <div class="main-card">
-                <form id="scraperForm">
+            <!-- Tab Navigation -->
+            <div class="tabs">
+                <div class="tab active" data-tab="maps">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Google Maps
+                </div>
+                <div class="tab" data-tab="history">
+                    <i class="fas fa-history"></i>
+                    History
+                </div>
+            </div>
+
+            <!-- Maps Tab Content -->
+            <div class="tab-content active" id="maps-tab">
+                <div class="main-card">
+                    <form id="scraperForm">
                     <div class="form-group">
                         <label class="form-label" for="search_query">Search Query</label>
                         <input type="text" id="search_query" name="search_query" class="form-input" 
@@ -394,6 +518,35 @@ def index():
                         <a href="#" class="download-button" id="downloadExcel">📊 Download Excel</a>
                         <a href="#" class="download-button" id="downloadCsv">📄 Download CSV</a>
                         <a href="#" class="download-button" id="downloadJson">📋 Download JSON</a>
+                    </div>
+                </div>
+            </div>
+            </div> <!-- End Maps Tab -->
+
+            <!-- History Tab Content -->
+            <div class="tab-content" id="history-tab">
+                <div class="main-card">
+                    <h2 style="color: #f8c800; margin-bottom: 20px;">📁 Scraping History</h2>
+                    <p style="color: #ccc; margin-bottom: 20px;">All your scraped files are listed below. Click to download.</p>
+                    
+                    <div id="historyLoading" style="text-align: center; color: #ccc; padding: 20px;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading history...
+                    </div>
+                    
+                    <div id="historyContent" style="display: none;">
+                        <div id="historyList" class="history-list">
+                            <!-- History items will be populated here -->
+                        </div>
+                        
+                        <button id="refreshHistory" class="start-button" style="margin-top: 20px;">
+                            <i class="fas fa-sync-alt"></i> Refresh History
+                        </button>
+                    </div>
+                    
+                    <div id="noHistory" style="display: none; text-align: center; color: #ccc; padding: 40px;">
+                        <i class="fas fa-folder-open" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+                        <p>No scraping history found.</p>
+                        <p style="font-size: 0.9rem; margin-top: 10px;">Start scraping to see your files here!</p>
                     </div>
                 </div>
             </div>
@@ -539,7 +692,7 @@ def index():
                     box.scrollTop = box.scrollHeight;
                 }
 
-                showResults(data) {
+                async showResults(data) {
                     this.progressSection.style.display = 'none';
                     this.resultsSection.style.display = 'block';
                     
@@ -551,47 +704,75 @@ def index():
                     const resultsText = document.querySelector('#resultsText');
                     resultsText.textContent = 'Your scraping is complete! Download your results below.';
                     
-                    // Set download links
-                    console.log('Available files:', data.available_files);
-                    console.log('Output file:', data.output_file);
+                    // ALWAYS fetch the latest files from /files endpoint to ensure we get the most recent file
+                    console.log('Scraping completed, fetching latest files...');
+                    await this.fetchLatestFiles();
                     
-                    const availableFiles = data.available_files || [];
-                    if (availableFiles.length > 0) {
-                        // Files should already be sorted, but let's sort by modification time if available
-                        console.log('Available files from status:', availableFiles);
+                    // Also refresh history if history tab exists
+                    if (window.tabManager) {
+                        window.tabManager.loadHistory(true);
+                    }
+                }
+
+                async fetchLatestFiles() {
+                    try {
+                        console.log('Fetching latest files from /files endpoint...');
+                        const response = await fetch('/files');
+                        const data = await response.json();
+                        console.log('Latest files response:', data);
                         
-                        // Show the most recent file of each type (first match since they should be sorted)
-                        const recentXlsx = availableFiles.find(f => f.endsWith('.xlsx'));
-                        const recentCsv = availableFiles.find(f => f.endsWith('.csv'));
-                        const recentJson = availableFiles.find(f => f.endsWith('.json'));
+                        const files = data.files || [];
+                        const filesWithDetails = data.files_with_details || [];
                         
-                        console.log('Most recent files from status:', { recentXlsx, recentCsv, recentJson });
-                        
-                        if (recentXlsx) {
-                            this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
-                            this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
-                            this.downloadExcel.style.display = 'inline-block';
-                            console.log('Set Excel download link from status to:', recentXlsx);
+                        if (files.length > 0) {
+                            // Files are already sorted by modification time (most recent first) from the server
+                            console.log('Latest files (sorted by server):', files);
+                            console.log('Files with details:', filesWithDetails);
+                            
+                            // Show the most recent file of each type
+                            const recentXlsx = files.find(f => f.endsWith('.xlsx'));
+                            const recentCsv = files.find(f => f.endsWith('.csv'));
+                            const recentJson = files.find(f => f.endsWith('.json'));
+                            
+                            console.log('Most recent files:', { recentXlsx, recentCsv, recentJson });
+                            
+                            // Show file details if available
+                            if (recentXlsx && filesWithDetails.length > 0) {
+                                const xlsxDetails = filesWithDetails.find(f => f.filename === recentXlsx);
+                                if (xlsxDetails) {
+                                    const modTime = new Date(xlsxDetails.mod_time * 1000);
+                                    console.log(`Latest Excel file: ${recentXlsx} (created: ${modTime.toLocaleString()})`);
+                                }
+                            }
+                            
+                            if (recentXlsx) {
+                                this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
+                                this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
+                                this.downloadExcel.style.display = 'inline-block';
+                                console.log('✅ Set Excel download link to LATEST file:', recentXlsx);
+                            }
+                            if (recentCsv) {
+                                this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
+                                this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
+                                this.downloadCsv.style.display = 'inline-block';
+                                console.log('✅ Set CSV download link to LATEST file:', recentCsv);
+                            }
+                            if (recentJson) {
+                                this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
+                                this.downloadJson.textContent = `📋 Download ${recentJson}`;
+                                this.downloadJson.style.display = 'inline-block';
+                                console.log('✅ Set JSON download link to LATEST file:', recentJson);
+                            }
+                        } else {
+                            console.log('❌ No files found in /files endpoint');
+                            this.downloadExcel.textContent = 'No files available';
+                            this.downloadExcel.style.display = 'none';
+                            this.downloadCsv.style.display = 'none';
+                            this.downloadJson.style.display = 'none';
                         }
-                        if (recentCsv) {
-                            this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
-                            this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
-                            this.downloadCsv.style.display = 'inline-block';
-                            console.log('Set CSV download link from status to:', recentCsv);
-                        }
-                        if (recentJson) {
-                            this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
-                            this.downloadJson.textContent = `📋 Download ${recentJson}`;
-                            this.downloadJson.style.display = 'inline-block';
-                            console.log('Set JSON download link from status to:', recentJson);
-                        }
-                    } else if (data.output_file) {
-                        this.downloadExcel.href = `/download/${encodeURIComponent(data.output_file)}`;
-                        this.downloadExcel.textContent = `📊 Download ${data.output_file}`;
-                        this.downloadExcel.style.display = 'inline-block';
-                    } else {
-                        // No files available - try to fetch from /files endpoint
-                        console.log('No files in status response, trying /files endpoint...');
+                    } catch (error) {
+                        console.error('❌ Error fetching latest files:', error);
+                        // Fallback to old method
                         this.fetchAvailableFiles();
                     }
                 }
@@ -647,9 +828,120 @@ def index():
                 }
             }
 
-            // Initialize the scraper when page loads
+            // Tab Management
+            class TabManager {
+                constructor() {
+                    this.init();
+                }
+
+                init() {
+                    // Add click listeners to tabs
+                    document.querySelectorAll('.tab').forEach(tab => {
+                        tab.addEventListener('click', (e) => {
+                            const tabName = e.currentTarget.getAttribute('data-tab');
+                            this.switchTab(tabName);
+                        });
+                    });
+
+                    // Load history when history tab is first clicked
+                    document.querySelector('[data-tab="history"]').addEventListener('click', () => {
+                        this.loadHistory();
+                    });
+
+                    // Refresh history button
+                    document.getElementById('refreshHistory').addEventListener('click', () => {
+                        this.loadHistory(true);
+                    });
+                }
+
+                switchTab(tabName) {
+                    // Remove active class from all tabs and content
+                    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+                    // Add active class to selected tab and content
+                    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+                    document.getElementById(`${tabName}-tab`).classList.add('active');
+                }
+
+                async loadHistory(forceRefresh = false) {
+                    const historyLoading = document.getElementById('historyLoading');
+                    const historyContent = document.getElementById('historyContent');
+                    const noHistory = document.getElementById('noHistory');
+                    const historyList = document.getElementById('historyList');
+
+                    // Show loading state
+                    historyLoading.style.display = 'block';
+                    historyContent.style.display = 'none';
+                    noHistory.style.display = 'none';
+
+                    try {
+                        console.log('Loading history...');
+                        const response = await fetch('/files');
+                        const data = await response.json();
+                        console.log('History data:', data);
+
+                        const files = data.files || [];
+                        const filesWithDetails = data.files_with_details || [];
+
+                        if (files.length === 0) {
+                            historyLoading.style.display = 'none';
+                            noHistory.style.display = 'block';
+                            return;
+                        }
+
+                        // Create history items
+                        historyList.innerHTML = '';
+                        
+                        files.forEach((filename, index) => {
+                            const fileDetails = filesWithDetails.find(f => f.filename === filename);
+                            const modTime = fileDetails ? new Date(fileDetails.mod_time * 1000) : new Date();
+                            const fileSize = this.getFileSize(filename);
+                            
+                            const historyItem = document.createElement('div');
+                            historyItem.className = 'history-item';
+                            
+                            // Extract search query from filename
+                            const searchQuery = filename.replace(' - GMS output', '').replace(/\s*\(\d+\)\.xlsx$/, '').replace(/\.xlsx$/, '');
+                            
+                            historyItem.innerHTML = `
+                                <div class="history-info">
+                                    <div class="history-filename">${filename}</div>
+                                    <div class="history-details">
+                                        <span><i class="fas fa-search"></i> ${searchQuery}</span>
+                                        <span><i class="fas fa-clock"></i> ${modTime.toLocaleString()}</span>
+                                        <span><i class="fas fa-file-excel"></i> Excel</span>
+                                    </div>
+                                </div>
+                                <a href="/download/${encodeURIComponent(filename)}" class="history-download">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            `;
+                            
+                            historyList.appendChild(historyItem);
+                        });
+
+                        historyLoading.style.display = 'none';
+                        historyContent.style.display = 'block';
+
+                    } catch (error) {
+                        console.error('Error loading history:', error);
+                        historyLoading.style.display = 'none';
+                        noHistory.style.display = 'block';
+                    }
+                }
+
+                getFileSize(filename) {
+                    // This would require a separate API call to get file sizes
+                    // For now, return a placeholder
+                    return 'Unknown size';
+                }
+            }
+
+            // Initialize everything when page loads
             document.addEventListener('DOMContentLoaded', () => {
                 window.scraperInstance = new GoogleMapsScraper();
+                window.tabManager = new TabManager();
             });
         </script>
     </body>
