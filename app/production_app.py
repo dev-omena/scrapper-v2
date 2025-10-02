@@ -535,35 +535,33 @@ def index():
                     
                     const availableFiles = data.available_files || [];
                     if (availableFiles.length > 0) {
-                        // Sort files to get the most recent one (highest number or latest)
-                        const sortedFiles = availableFiles.sort((a, b) => {
-                            // Extract numbers from filenames for proper sorting
-                            const aNum = a.match(/\((\d+)\)/);
-                            const bNum = b.match(/\((\d+)\)/);
-                            const aNumValue = aNum ? parseInt(aNum[1]) : 0;
-                            const bNumValue = bNum ? parseInt(bNum[1]) : 0;
-                            return bNumValue - aNumValue; // Sort descending (newest first)
-                        });
+                        // Files should already be sorted, but let's sort by modification time if available
+                        console.log('Available files from status:', availableFiles);
                         
-                        // Show the most recent file of each type
-                        const recentXlsx = sortedFiles.find(f => f.endsWith('.xlsx'));
-                        const recentCsv = sortedFiles.find(f => f.endsWith('.csv'));
-                        const recentJson = sortedFiles.find(f => f.endsWith('.json'));
+                        // Show the most recent file of each type (first match since they should be sorted)
+                        const recentXlsx = availableFiles.find(f => f.endsWith('.xlsx'));
+                        const recentCsv = availableFiles.find(f => f.endsWith('.csv'));
+                        const recentJson = availableFiles.find(f => f.endsWith('.json'));
+                        
+                        console.log('Most recent files from status:', { recentXlsx, recentCsv, recentJson });
                         
                         if (recentXlsx) {
                             this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
                             this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
                             this.downloadExcel.style.display = 'inline-block';
+                            console.log('Set Excel download link from status to:', recentXlsx);
                         }
                         if (recentCsv) {
                             this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
                             this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
                             this.downloadCsv.style.display = 'inline-block';
+                            console.log('Set CSV download link from status to:', recentCsv);
                         }
                         if (recentJson) {
                             this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
                             this.downloadJson.textContent = `📋 Download ${recentJson}`;
                             this.downloadJson.style.display = 'inline-block';
+                            console.log('Set JSON download link from status to:', recentJson);
                         }
                     } else if (data.output_file) {
                         this.downloadExcel.href = `/download/${encodeURIComponent(data.output_file)}`;
@@ -585,35 +583,34 @@ def index():
                         
                         const files = data.files || [];
                         if (files.length > 0) {
-                            // Sort files to get the most recent one (highest number or latest)
-                            const sortedFiles = files.sort((a, b) => {
-                                // Extract numbers from filenames for proper sorting
-                                const aNum = a.match(/\((\d+)\)/);
-                                const bNum = b.match(/\((\d+)\)/);
-                                const aNumValue = aNum ? parseInt(aNum[1]) : 0;
-                                const bNumValue = bNum ? parseInt(bNum[1]) : 0;
-                                return bNumValue - aNumValue; // Sort descending (newest first)
-                            });
+                            // Files are already sorted by modification time (most recent first) from the server
+                            console.log('Files already sorted by server:', files);
+                            console.log('Files with details:', data.files_with_details);
                             
                             // Show the most recent file of each type
-                            const recentXlsx = sortedFiles.find(f => f.endsWith('.xlsx'));
-                            const recentCsv = sortedFiles.find(f => f.endsWith('.csv'));
-                            const recentJson = sortedFiles.find(f => f.endsWith('.json'));
+                            const recentXlsx = files.find(f => f.endsWith('.xlsx'));
+                            const recentCsv = files.find(f => f.endsWith('.csv'));
+                            const recentJson = files.find(f => f.endsWith('.json'));
+                            
+                            console.log('Most recent files:', { recentXlsx, recentCsv, recentJson });
                             
                             if (recentXlsx) {
                                 this.downloadExcel.href = `/download/${encodeURIComponent(recentXlsx)}`;
                                 this.downloadExcel.textContent = `📊 Download ${recentXlsx}`;
                                 this.downloadExcel.style.display = 'inline-block';
+                                console.log('Set Excel download link to:', recentXlsx);
                             }
                             if (recentCsv) {
                                 this.downloadCsv.href = `/download/${encodeURIComponent(recentCsv)}`;
                                 this.downloadCsv.textContent = `📄 Download ${recentCsv}`;
                                 this.downloadCsv.style.display = 'inline-block';
+                                console.log('Set CSV download link to:', recentCsv);
                             }
                             if (recentJson) {
                                 this.downloadJson.href = `/download/${encodeURIComponent(recentJson)}`;
                                 this.downloadJson.textContent = `📋 Download ${recentJson}`;
                                 this.downloadJson.style.display = 'inline-block';
+                                console.log('Set JSON download link to:', recentJson);
                             }
                         } else {
                             console.log('No files found in /files endpoint');
@@ -767,20 +764,37 @@ def scrape():
 def status():
     """Get current scraping status"""
     # Check for output files in multiple possible output directories (prioritize main output dir)
-    output_files = []
+    all_files_with_time = []
     possible_output_dirs = ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']
     
     for output_dir in possible_output_dirs:
         if os.path.exists(output_dir):
             try:
-                files = [f for f in os.listdir(output_dir) if f.endswith(('.xlsx', '.csv', '.json'))]
-                output_files.extend(files)
+                all_files = os.listdir(output_dir)
+                files = [f for f in all_files if f.endswith(('.xlsx', '.csv', '.json'))]
+                
+                # Get file modification times for sorting
+                for f in files:
+                    file_path = os.path.join(output_dir, f)
+                    if os.path.isfile(file_path):
+                        mod_time = os.path.getmtime(file_path)
+                        all_files_with_time.append((f, mod_time, output_dir))
+                
                 print(f"DEBUG: Found {len(files)} files in {output_dir}: {files}")
             except Exception as e:
                 print(f"DEBUG: Error reading {output_dir}: {e}")
     
-    # Remove duplicates while preserving order
-    output_files = list(dict.fromkeys(output_files))
+    # Remove duplicates by filename (keep the one with latest modification time)
+    unique_files = {}
+    for filename, mod_time, output_dir in all_files_with_time:
+        if filename not in unique_files or mod_time > unique_files[filename][1]:
+            unique_files[filename] = (filename, mod_time, output_dir)
+    
+    # Sort by modification time (most recent first)
+    sorted_files = sorted(unique_files.values(), key=lambda x: x[1], reverse=True)
+    output_files = [f[0] for f in sorted_files]  # Extract just the filenames
+    
+    print(f"DEBUG: Status endpoint - Final sorted files (most recent first): {output_files}")
     
     return jsonify({
         "status": production_comm.status,
@@ -794,7 +808,7 @@ def status():
 @app.route('/files')
 def list_files():
     """List all available files for download"""
-    output_files = []
+    all_files_with_time = []
     # Check multiple possible output directories (prioritize main output dir)
     possible_output_dirs = ['/root/scrapper-v2/output', 'output', '../output', '/root/scrapper-v2/app/output']
     
@@ -803,29 +817,37 @@ def list_files():
             try:
                 all_files = os.listdir(output_dir)
                 files = [f for f in all_files if f.endswith(('.xlsx', '.csv', '.json'))]
-                output_files.extend(files)
+                
+                # Get file modification times for sorting
+                for f in files:
+                    file_path = os.path.join(output_dir, f)
+                    if os.path.isfile(file_path):
+                        mod_time = os.path.getmtime(file_path)
+                        all_files_with_time.append((f, mod_time, output_dir))
+                
                 print(f"DEBUG: Found {len(files)} files in {output_dir}: {files}")
             except Exception as e:
                 print(f"DEBUG: Error reading {output_dir}: {e}")
     
-    # Remove duplicates while preserving order
-    output_files = list(dict.fromkeys(output_files))
+    # Remove duplicates by filename (keep the one with latest modification time)
+    unique_files = {}
+    for filename, mod_time, output_dir in all_files_with_time:
+        if filename not in unique_files or mod_time > unique_files[filename][1]:
+            unique_files[filename] = (filename, mod_time, output_dir)
+    
+    # Sort by modification time (most recent first)
+    sorted_files = sorted(unique_files.values(), key=lambda x: x[1], reverse=True)
+    output_files = [f[0] for f in sorted_files]  # Extract just the filenames
+    
+    print(f"DEBUG: Final sorted files (most recent first): {output_files}")
     
     if not output_files:
-        print("DEBUG: No output directories found")
+        print("DEBUG: No output files found in any directory")
     
-    # Also check for the most recent file if no specific files found
-    if not output_files and os.path.exists('output'):
-        all_files = os.listdir('output')
-        if all_files:
-            # Get the most recently modified file
-            files_with_time = [(f, os.path.getmtime(os.path.join('output', f))) for f in all_files if os.path.isfile(os.path.join('output', f))]
-            if files_with_time:
-                most_recent = max(files_with_time, key=lambda x: x[1])
-                print(f"DEBUG: Most recent file: {most_recent[0]}")
-                output_files = [most_recent[0]]
-    
-    return jsonify({"files": output_files, "all_files": all_files if os.path.exists('output') else []})
+    return jsonify({
+        "files": output_files,
+        "files_with_details": [{"filename": f[0], "mod_time": f[1], "directory": f[2]} for f in sorted_files]
+    })
 
 @app.route('/download/<filename>')
 def download_file(filename):
