@@ -636,6 +636,37 @@ class ImprovedScroller:
             Communicator.show_message("Few results found, trying comprehensive final extraction...")
             print("DEBUG: Attempting comprehensive final extraction")
             
+            # If we have very few results, suggest broader search terms
+            if len(self.all_results_links) <= 5:
+                Communicator.show_message("⚠️  VERY FEW RESULTS FOUND!")
+                Communicator.show_message("This might be because:")
+                Communicator.show_message("1. The search term is too specific")
+                Communicator.show_message("2. There are genuinely few businesses in this area")
+                Communicator.show_message("3. Google Maps is limiting results")
+                Communicator.show_message("💡 Try broader search terms like:")
+                
+                # Extract the original search query and suggest alternatives
+                try:
+                    from scraper.communicator import Communicator
+                    backend = Communicator.get_backend_object()
+                    if hasattr(backend, 'searchquery'):
+                        original_query = backend.searchquery
+                        
+                        # Suggest broader alternatives
+                        if 'الرياض' in original_query:
+                            Communicator.show_message(f"   • Try: '{original_query.replace('الرياض', 'السعودية')}'")
+                            Communicator.show_message(f"   • Try: '{original_query.split()[0]} {original_query.split()[1]}'")
+                        elif 'في' in original_query:
+                            parts = original_query.split('في')
+                            if len(parts) > 1:
+                                Communicator.show_message(f"   • Try: '{parts[0].strip()}'")
+                        
+                        Communicator.show_message("   • Try removing location-specific terms")
+                        Communicator.show_message("   • Try more general category terms")
+                        
+                except Exception as e:
+                    print(f"DEBUG: Could not generate suggestions: {str(e)}")
+            
             try:
                 # Try multiple selectors for links
                 comprehensive_selectors = [
@@ -686,9 +717,23 @@ class ImprovedScroller:
         print(f"DEBUG: all_results_links count: {len(self.all_results_links)}")
         
         if len(self.all_results_links) > 0:
-            Communicator.show_message(f"Total results found: {len(self.all_results_links)}")
+            # Provide summary based on result count
+            if len(self.all_results_links) <= 5:
+                Communicator.show_message(f"⚠️  Found only {len(self.all_results_links)} results")
+                Communicator.show_message("This is a small number - consider trying broader search terms")
+            elif len(self.all_results_links) <= 15:
+                Communicator.show_message(f"✅ Found {len(self.all_results_links)} results (moderate)")
+            else:
+                Communicator.show_message(f"🎉 Found {len(self.all_results_links)} results (good coverage)")
+            
             print(f"DEBUG: Starting parsing with {len(self.all_results_links)} links")
             self.start_parsing()
         else:
-            Communicator.show_message("No results to parse - no links were collected")
+            Communicator.show_message("❌ ERROR: No results found to parse")
+            Communicator.show_message("This could indicate:")
+            Communicator.show_message("1. No businesses found for this search")
+            Communicator.show_message("2. Google Maps page structure changed")
+            Communicator.show_message("3. Search query too specific")
+            Communicator.show_message("4. Geographic location has limited results")
+            Communicator.show_message("💡 Try: More general search terms or different location")
             print("ERROR: No results to parse - all_results_links is empty")
