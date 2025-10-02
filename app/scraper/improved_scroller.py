@@ -441,33 +441,69 @@ class ImprovedScroller:
                     "return arguments[0].scrollHeight", scrollAbleElement
                 )
                 
-                # Scroll down in increments to trigger loading
-                for i in range(3):  # Scroll 3 times in small increments
+                print(f"DEBUG: Current scroll height: {current_scroll_height}")
+                
+                # If we've been getting the same results, try more aggressive scrolling
+                if no_new_results_count > 2 and len(self.all_results_links) < 10:
+                    print("DEBUG: Using extra aggressive scrolling due to stuck results")
+                    
+                    # Try scrolling with different strategies
+                    strategies = [
+                        "arguments[0].scrollBy(0, 500);",  # Scroll by pixels
+                        "arguments[0].scrollTo(0, arguments[0].scrollTop + arguments[0].clientHeight);",  # Scroll by viewport height
+                        "arguments[0].scrollTo(0, arguments[0].scrollHeight * 0.7);",  # Scroll to 70%
+                        "arguments[0].scrollTo(0, arguments[0].scrollHeight * 0.9);",  # Scroll to 90%
+                        "arguments[0].scrollTo(0, arguments[0].scrollHeight);",  # Scroll to bottom
+                    ]
+                    
+                    for i, strategy in enumerate(strategies):
+                        try:
+                            self.driver.execute_script(strategy, scrollAbleElement)
+                            time.sleep(1.5)  # Wait between each strategy
+                            print(f"DEBUG: Applied scrolling strategy {i+1}")
+                        except:
+                            continue
+                    
+                    # Extra wait for lazy loading
+                    time.sleep(5)
+                    
+                else:
+                    # Normal scrolling strategy
+                    # Scroll down in increments to trigger loading
+                    for i in range(3):  # Scroll 3 times in small increments
+                        self.driver.execute_script(
+                            f"arguments[0].scrollTo(0, arguments[0].scrollHeight * {0.8 + (i * 0.1)});",
+                            scrollAbleElement,
+                        )
+                        time.sleep(1)  # Wait between scrolls
+                    
+                    # Final scroll to bottom
                     self.driver.execute_script(
-                        f"arguments[0].scrollTo(0, arguments[0].scrollHeight * {0.8 + (i * 0.1)});",
+                        "arguments[0].scrollTo(0, arguments[0].scrollHeight);",
                         scrollAbleElement,
                     )
-                    time.sleep(1)  # Wait between scrolls
-                
-                # Final scroll to bottom
-                self.driver.execute_script(
-                    "arguments[0].scrollTo(0, arguments[0].scrollHeight);",
-                    scrollAbleElement,
-                )
-                
-                # Wait longer for results to load, especially if we have few results
-                if len(self.all_results_links) < min_results_before_stopping:
-                    time.sleep(4)  # Wait longer when we have few results
-                else:
-                    time.sleep(2)
+                    
+                    # Wait longer for results to load, especially if we have few results
+                    if len(self.all_results_links) < min_results_before_stopping:
+                        time.sleep(4)  # Wait longer when we have few results
+                    else:
+                        time.sleep(2)
                 
                 # Get new scroll height
                 new_height = self.driver.execute_script(
                     "return arguments[0].scrollHeight", scrollAbleElement
                 )
                 
-                # Extract new links
+                # Extract new links with enhanced debugging
+                print(f"DEBUG: Extracting links after scroll attempt {scroll_attempts}")
                 new_links = self.extract_links_from_element(scrollAbleElement)
+                print(f"DEBUG: Extraction returned {len(new_links)} links")
+                
+                # Debug: Check if we're getting the same links
+                if len(new_links) > 0:
+                    print(f"DEBUG: First extracted link: {new_links[0][:100]}")
+                    if len(new_links) > 1:
+                        print(f"DEBUG: Last extracted link: {new_links[-1][:100]}")
                 
                 # Add only unique links using set for faster lookup
                 added_count = 0
@@ -476,9 +512,40 @@ class ImprovedScroller:
                         self.unique_links.add(link)
                         self.all_results_links.append(link)
                         added_count += 1
+                        print(f"DEBUG: Added new unique link: {link[:80]}...")
                 
-                print(f"DEBUG: Added {added_count} new links. Total: {len(self.all_results_links)}")
+                print(f"DEBUG: Added {added_count} new links. Total unique: {len(self.all_results_links)}")
+                print(f"DEBUG: Current unique_links set size: {len(self.unique_links)}")
                 Communicator.show_message(f"Found {len(self.all_results_links)} results so far...")
+                
+                # If we're not finding new results, try alternative extraction methods
+                if added_count == 0 and len(self.all_results_links) < 10:
+                    print("DEBUG: No new results found, trying alternative extraction...")
+                    
+                    # Try extracting from the entire page instead of just the scrollable element
+                    try:
+                        all_page_links = self.driver.find_elements("css selector", "a[href*='/maps/place/']")
+                        print(f"DEBUG: Found {len(all_page_links)} total page links")
+                        
+                        alternative_added = 0
+                        for link_elem in all_page_links:
+                            try:
+                                href = link_elem.get_attribute('href')
+                                if href and href not in self.unique_links:
+                                    self.unique_links.add(href)
+                                    self.all_results_links.append(href)
+                                    alternative_added += 1
+                                    print(f"DEBUG: Alternative method added: {href[:80]}...")
+                            except:
+                                continue
+                        
+                        if alternative_added > 0:
+                            added_count = alternative_added
+                            print(f"DEBUG: Alternative extraction added {alternative_added} new links")
+                            Communicator.show_message(f"Alternative extraction found {alternative_added} additional results")
+                        
+                    except Exception as e:
+                        print(f"DEBUG: Alternative extraction failed: {str(e)}")
                 
                 # Track scroll height changes
                 if new_height == last_height:
